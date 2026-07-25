@@ -4,16 +4,17 @@ Live map of project layout, components, and patterns. Seeded at bootstrap; updat
 
 ## Current state
 
-**The product renders, and you can now change it while it runs.** Generations accumulate into a structure
-you can look at, walk around, and adjust.
+**Every control the PRD specifies now exists.** Generations accumulate into a structure you can look at,
+walk around, adjust, resize, and start over.
 
 Issue #3 scaffolded the project and proved the deployment path. #4 built the simulation, #5 the bounded
 history window, #6 drew it, #8 gave it colour, fade, and cubic edge-drawn cells, #7 made it something you
-can walk around, and #9 gave it a control panel for Speed, Depth Window, Maximum Age, and Cell Size.
+can walk around, #9 gave it a control panel for Speed, Depth Window, Maximum Age, and Cell Size, and #10
+added staged Grid dimensions and Restart.
 
-Not yet built: Grid dimensions and Restart (#10), phone layout (#11), the drawing budget (#12), and link
-previews (#13). The panel is desktop-only in its layout, and the Depth Window ceiling it permits is
-unmeasured — both deliberate, and owned by those issues.
+Not yet built: phone layout (#11), the drawing budget (#12), and link previews (#13). The panel's layout is
+desktop-shaped — it scrolls rather than fits on a short viewport — and the instance ceiling it permits has
+never been measured. Both deliberate, and owned by those issues.
 
 What is built:
 
@@ -41,8 +42,8 @@ Everything under "Planned layout" below that is not listed above is still unbuil
 ```
 index.html            Full-viewport canvas (#viewport), meta tags, minimal inline CSS
 src/
-  main.ts             Composition root — rAF loop, settings diff, Depth Window travel
-  settings.ts         Starting values, live setting bounds, clamping
+  main.ts             Composition root — the Run object, rAF loop, settings diff, Restart
+  settings.ts         Starting values, bounds for every setting, clamping
   sim/                Pure simulation — imports nothing outside itself
     grid.ts           Grid storage, index arithmetic, Bounded Edge, neighbour counting
     rules.ts          B3/S23 + age increment + Death by Old Age
@@ -50,12 +51,12 @@ src/
     simulation.ts     Run state — generation counter, Maximum Age, Stack, advance(), restart()
     clock.ts          Elapsed time to Generations — pause, resume, backgrounded-tab cap
   render/             Drawing — may read the simulation, never the reverse
-    scene.ts          Renderer, camera, OrbitControls, resize, reframe on Depth Window
+    scene.ts          Renderer, camera, OrbitControls, resize, reframe on extent change
     instances.ts      Instanced geometry, GLSL shaders, ring slot arithmetic, uniforms
     structure.ts      Binds a Run's Stack to the instance buffer; re-lays the ring
   ui/                 Control surface — mutates settings, knows nothing else
-    panel.ts          The four live controls, built from native range inputs
-    panel.css         Panel styling
+    panel.ts          Six controls plus Restart, built from native range inputs
+    panel.css         Panel styling, including the viewport height bound
 e2e/
   smoke.mjs           Headless render + screenshot — local only, never CI
 tests/
@@ -132,9 +133,18 @@ Depth Window ceiling to size the ring — and it would add an edge to the graph 
 passes `ringCapacity` in. Every value the renderer needs from a setting arrives as an argument.
 
 **How a moved slider reaches the thing it changes.** The panel writes into the settings object on `input`,
-so a value is live mid-drag. `main.ts` compares four scalars per frame against what it has applied and acts
-on the difference — constant work regardless of instance count. Nothing observes, subscribes, or notifies:
-the interface would otherwise need opinions about what each setting affects.
+so a value is live mid-drag. `main.ts` compares a handful of scalars per frame against what it has applied
+and acts on the difference — constant work regardless of instance count. Nothing observes, subscribes, or
+notifies: the interface would otherwise need opinions about what each setting affects.
+
+**Live settings versus staged settings.** Speed, Depth Window, Maximum Age, and Cell Size reach the Run on
+the next frame. Grid width and height are *staged* — read only when a Run starts, because a Layer computed at
+one Grid size cannot coherently stack on Layers computed at another. All six are bounded in the same table;
+being bounded and being applied immediately are separate questions.
+
+The consequence is an interface obligation, not just a code one: a staged change that silently waits is
+indistinguishable from one that failed, so `panel.ts` marks a staged value whose Run has not caught up yet
+and says on the Restart button what pressing it will do.
 
 The hard rule: **`src/sim/` must never import three.js, touch the DOM, or reference rendering concepts.**
 This is what makes the simulation unit-testable, and it is the first thing to check when a change to
@@ -349,9 +359,34 @@ that banked elapsed time looks correct until it is released, then discharges a b
 advances nothing *and* accumulates nothing. `retimeAccumulator` trims a carried accumulator when Speed
 changes, so raising it does not discharge time banked against a slower interval.
 
+### `src/main.ts`
+
+The composition root, and the only module that knows about all three layers.
+
+**The Run is one object, replaced whole.** `startRun()` is the single path that begins a Run, used at boot
+and on any Restart that changes dimensions. It is the one place here that allocates, and that is acceptable
+only because it happens on a Viewer action: a Grid size is fixed for the life of a `Simulation`, the Stack is
+sized from it, and instance Grid positions are written once at construction, so a new size means new buffers.
+
+Grouping the Run's state — the two Grid dimensions it started at, three applied-setting snapshots, both Depth
+Window travel values, and the time accumulator — is deliberate. Held separately, starting a Run means
+resetting each of them, and forgetting one fails severely and traces back poorly: stale travel state re-lays
+a ring that no longer exists, and a stale accumulator discharges the previous Run's banked time into the new
+one. Replacing an object cannot half-happen.
+
+**Restart is a flag the loop lowers, not a callback the panel invokes.** Every change to Run state then
+happens at one known point in the frame, instead of a `Simulation` being swapped part-way through a frame
+that still holds a reference to the old one — and a Restart requested while paused behaves like any other,
+because the loop runs regardless of Speed.
+
+**Restart takes the cheap path when it can.** Unchanged dimensions reseed inside buffers that are already the
+right size (`simulation.restart()` + `view.reset()`, no allocation); only a changed Grid rebuilds. The
+`stage` deliberately outlives every Run — the camera is the Viewer's vantage point and starting a new Run
+should not throw away where they were standing.
+
 ### `src/ui/panel.ts`
 
-The four live controls. Mutates the settings object; imports nothing from `sim/` or `render/`.
+Six controls and the Restart button. Mutates plain objects; imports nothing from `sim/` or `render/`.
 
 Native `<input type="range">` restyled rather than hand-drawn sliders: pointer capture, touch, keyboard,
 and screen-reader semantics come free, and #11's touch requirement depends on that half already working.
@@ -361,13 +396,21 @@ build more than once.
 `SETTING_BOUNDS` in `settings.ts` is the single source for every control's range and step — the panel reads
 it, and clamping is applied on every write so a value off the step never reaches the ring arithmetic.
 
+**The panel is bounded to the viewport height and scrolls inside itself.** It is `position: fixed`, so
+anything past the bottom of the viewport is unreachable — there is no page to scroll. With six controls and a
+button it exceeds a short window, and the control that fell off the end was Restart. Adding a seventh control
+without checking a short viewport reintroduces that, and nothing automated guards it.
+
 ## Known risks
 
-- **The instance cap has no number, and the panel now permits twice the default.** Defaults are
-  48 × 48 × 60 — about 138,000 instances — chosen to look right, not measured. Since #9 the Depth Window
-  slider reaches 120, so a Viewer can ask for 276,480, and the ring is *allocated* at that ceiling
-  regardless of the current setting. Grid dimensions × depth determines the draw, and there is no server to
-  absorb it. `SETTING_BOUNDS` is deliberately the single place #12 writes the measured limit.
+- **The instance cap has no number, and the panel now permits four times what has ever shipped.** Defaults
+  are 48 × 48 × 60 — about 138,000 instances — chosen to look right, not measured. Since #9 the Depth Window
+  slider reaches 120; since #10 both Grid dimensions reach 96. A Viewer can therefore ask for
+  96 × 96 × 120 = 1,105,920 instances, roughly thirteen million triangles a frame, and the ring is
+  *allocated* at the Depth Window ceiling regardless of the current setting. The cost is area, not length:
+  96 is four times 48, not twice. Every instance is transformed each frame whether its Cell is alive or dead,
+  and in a typical Run most are dead. There is no server to absorb any of it. `SETTING_BOUNDS` is
+  deliberately the single place #12 writes the measured limit for both halves of the product.
 - **Smoothness has never been observed on a real GPU.** Every render check so far ran against a software
   rasteriser, whose frame timings mean nothing. The design keeps per-frame CPU work constant, but that is
   reasoning, not evidence.
