@@ -5,6 +5,7 @@ import {
 	MAX_REPRESENTABLE_AGE,
 } from "@/sim/grid";
 import { nextGeneration } from "@/sim/rules";
+import { LayerStack } from "@/sim/stack";
 
 /**
  * A Run: a continuous sequence of Generations from 0 until the next Restart.
@@ -23,6 +24,8 @@ export interface SimulationOptions {
 	height: number;
 	/** Age at which a live Cell dies regardless of its neighbours. */
 	maximumAge: number;
+	/** N — how many Layers of history the Stack retains. */
+	depthWindow?: number;
 	/** Proportion of positions alive at Generation 0, in [0, 1]. */
 	seedDensity?: number;
 	random?: RandomSource;
@@ -36,6 +39,17 @@ export interface SimulationOptions {
  */
 export const DEFAULT_SEED_DENSITY = 0.35;
 
+/**
+ * Layers of history retained when none is specified.
+ *
+ * Deep enough that a glider's diagonal streak reads as a streak rather than a
+ * smudge, shallow enough that the structure does not occlude itself into an
+ * opaque brick. The binding ceiling is not this value but the drawing budget —
+ * grid dimensions multiplied by depth determines how much must be drawn, and
+ * that limit is set by measurement on real hardware.
+ */
+export const DEFAULT_DEPTH_WINDOW = 120;
+
 export class Simulation {
 	readonly width: number;
 	readonly height: number;
@@ -46,10 +60,12 @@ export class Simulation {
 	private currentMaximumAge: number;
 	private readonly seedDensity: number;
 	private readonly random: RandomSource;
+	private readonly layers: LayerStack;
 
 	constructor(options: SimulationOptions) {
 		const { width, height, maximumAge } = options;
 		const seedDensity = options.seedDensity ?? DEFAULT_SEED_DENSITY;
+		const depthWindow = options.depthWindow ?? DEFAULT_DEPTH_WINDOW;
 
 		if (seedDensity < 0 || seedDensity > 1) {
 			throw new Error(`Seed density must be within [0, 1], got ${seedDensity}`);
@@ -62,6 +78,7 @@ export class Simulation {
 		this.currentMaximumAge = validateMaximumAge(maximumAge);
 		this.seedDensity = seedDensity;
 		this.random = options.random ?? Math.random;
+		this.layers = new LayerStack(width, height, depthWindow);
 
 		this.restart();
 	}
@@ -69,6 +86,11 @@ export class Simulation {
 	/** The current Generation. Callers must not mutate it. */
 	get grid(): Grid {
 		return this.currentGrid;
+	}
+
+	/** The bounded window of history — the Layers currently visible. */
+	get stack(): LayerStack {
+		return this.layers;
 	}
 
 	/** Generations elapsed since the Run began. 0 immediately after a Restart. */
@@ -91,7 +113,7 @@ export class Simulation {
 		this.currentMaximumAge = validateMaximumAge(value);
 	}
 
-	/** Advances the Run by one Generation. */
+	/** Advances the Run by one Generation, freezing it as the newest Layer. */
 	advance(): void {
 		nextGeneration(this.currentGrid, this.scratchGrid, this.currentMaximumAge);
 
@@ -100,6 +122,7 @@ export class Simulation {
 		this.scratchGrid = previous;
 
 		this.generationCount++;
+		this.layers.push(this.currentGrid, this.generationCount);
 	}
 
 	/**
@@ -118,6 +141,12 @@ export class Simulation {
 		}
 
 		this.generationCount = 0;
+
+		// Generation 0 is a Generation like any other, so the Seed becomes the
+		// first Layer. Skipping it would leave the bottom of a fresh structure
+		// missing the state everything above it grew from.
+		this.layers.clear();
+		this.layers.push(this.currentGrid, 0);
 	}
 }
 
