@@ -1,4 +1,4 @@
-import { PerspectiveCamera, Scene, WebGLRenderer } from "three";
+import { Color, PerspectiveCamera, Scene, WebGLRenderer } from "three";
 
 /**
  * Renderer, scene, and camera for the structure.
@@ -7,6 +7,16 @@ import { PerspectiveCamera, Scene, WebGLRenderer } from "three";
  * only has to place it somewhere the structure reads as three-dimensional —
  * looking straight down an axis would flatten a diagonal streak into a dot.
  */
+
+/**
+ * What the structure is drawn against, and what descending Layers fade into.
+ *
+ * Shared deliberately: the renderer clears to this colour and the shader mixes
+ * toward it, so a Layer reaching the bottom of the window lands exactly on the
+ * background and vanishes. If the two ever diverge, the "dissolve" becomes a
+ * visible grey floor.
+ */
+export const BACKGROUND_COLOR = 0x080a11;
 
 /** World units between adjacent Cells within a Layer. */
 export const CELL_SPACING = 1;
@@ -54,6 +64,7 @@ export function createScene(
 ): SceneHandle {
 	const renderer = new WebGLRenderer({ canvas, antialias: true });
 	renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
+	renderer.setClearColor(new Color(BACKGROUND_COLOR), 1);
 
 	const scene = new Scene();
 

@@ -8,7 +8,7 @@ import {
 	ShaderMaterial,
 } from "three";
 
-import { CELL_SPACING, LAYER_SPACING } from "@/render/scene";
+import { BACKGROUND_COLOR, CELL_SPACING, LAYER_SPACING } from "@/render/scene";
 
 /**
  * The whole Stack as a single instanced draw.
@@ -176,6 +176,7 @@ export function createStructureMesh(
 			uDepthWindow: { value: depthWindow },
 			uLayerSpacing: { value: LAYER_SPACING },
 			uGradient: { value: GRADIENT_STOPS.map((hex) => new Color(hex)) },
+			uBackground: { value: new Color(BACKGROUND_COLOR) },
 		},
 		vertexShader: VERTEX_SHADER,
 		fragmentShader: FRAGMENT_SHADER,
@@ -273,6 +274,15 @@ uniform float uLayerSpacing;
 varying vec3 vNormal;
 varying vec2 vUv;
 varying float vAgeFraction;
+varying float vSunk;
+
+/**
+ * Where the descent starts to show, as a fraction of the Depth Window.
+ *
+ * Below this the Stack keeps full presence, so most of the structure is read at
+ * full strength and only the oldest part dissolves.
+ */
+const float FADE_START = 0.55;
 
 void main() {
 	float depth = uCurrentGeneration - aBirthGeneration;
@@ -283,7 +293,17 @@ void main() {
 
 	float y = (uLayerCount - 1.0 - depth) * uLayerSpacing;
 
-	vec3 placed = position * (visible ? 1.0 : 0.0)
+	// How far through the Depth Window this Layer has sunk: 0 at the top, 1 as
+	// it leaves the bottom.
+	float sunk = clamp(depth / max(uDepthWindow - 1.0, 1.0), 0.0, 1.0);
+	vSunk = sunk;
+
+	// Shrink over the last stretch as well as fading, so a Layer dissolves
+	// rather than simply dimming in place. Retirement is then never a pop —
+	// by the time a slot is recycled its Cells have already shrunk away.
+	float shrink = 1.0 - smoothstep(FADE_START, 1.0, sunk);
+
+	vec3 placed = position * (visible ? shrink : 0.0)
 		+ vec3(aGridPosition.x, y, aGridPosition.y);
 
 	vNormal = normal;
@@ -310,10 +330,15 @@ void main() {
  */
 const FRAGMENT_SHADER = /* glsl */ `
 uniform vec3 uGradient[5];
+uniform vec3 uBackground;
 
 varying vec3 vNormal;
 varying vec2 vUv;
 varying float vAgeFraction;
+varying float vSunk;
+
+/** Matches the vertex shader — the two must dissolve together. */
+const float FADE_START = 0.55;
 
 const vec3 LIGHT_DIRECTION = normalize(vec3(0.4, 1.0, 0.7));
 
@@ -346,6 +371,13 @@ void main() {
 	float rim = smoothstep(0.0, fwidth(border) * EDGE_PIXELS, border);
 	shade *= mix(EDGE_DARKEN, 1.0, rim);
 
-	gl_FragColor = vec4(base * shade, 1.0);
+	// Mixing toward the background rather than using alpha keeps every Cell
+	// opaque, so depth sorting stays correct. Against a flat background the two
+	// are indistinguishable — and 138,000 unsorted transparent instances would
+	// punch holes through each other.
+	float fade = smoothstep(FADE_START, 1.0, vSunk);
+	vec3 lit = mix(base * shade, uBackground, fade);
+
+	gl_FragColor = vec4(lit, 1.0);
 }
 `;
