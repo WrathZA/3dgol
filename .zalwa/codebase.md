@@ -7,8 +7,9 @@ Live map of project layout, components, and patterns. Seeded at bootstrap; updat
 **Toolchain, deployment path, and the simulation core exist. Nothing is rendered yet.**
 
 Issue #3 scaffolded the project and proved the deployment path. Issue #4 built the simulation — the part
-that produces generations. Nothing imports `src/sim/` yet, so the deployed bundle is unchanged and the
-modules are tree-shaken out of the build; rendering (#6) wires them up.
+that produces generations. Issue #5 added the bounded history window, so generations now accumulate as
+layers. Nothing imports `src/sim/` yet, so the deployed bundle is unchanged and the modules are
+tree-shaken out of the build; rendering (#6) wires them up.
 
 What is built:
 
@@ -38,14 +39,16 @@ src/
   sim/                Pure simulation — imports nothing outside itself
     grid.ts           Grid storage, index arithmetic, Bounded Edge, neighbour counting
     rules.ts          B3/S23 + age increment + Death by Old Age
-    simulation.ts     Run state — generation counter, Maximum Age, advance(), restart()
+    stack.ts          LayerStack — ring buffer, Depth Window, retirement
+    simulation.ts     Run state — generation counter, Maximum Age, Stack, advance(), restart()
 tests/
   placeholder.test.ts Toolchain smoke test — runner, @/ alias, module import
   sim/
     helpers.ts        Pattern-to-Grid fixtures and comparison helpers (not a test file)
     grid.test.ts      Dimensions, Bounded Edge, neighbour counting
     rules.test.ts     Golden Life patterns, Age semantics, Death by Old Age
-    simulation.test.ts Run lifecycle, Seed density, determinism, Maximum Age changes
+    stack.test.ts     Retirement, Depth Window resize, constant memory, copy-not-reference
+    simulation.test.ts Run lifecycle, Seed density, determinism, Maximum Age, Stack integration
 biome.json            Scoped to src/, tests/, and config files only
 vite.config.ts        @/ alias + Vitest config (tests live in tests/**/*.test.ts)
 tsconfig.json         strict, noUncheckedIndexedAccess, @/ paths
@@ -165,9 +168,34 @@ plausible-looking wrong output.
 directly rather than inferred from Grid output. **Death by Old Age is checked before neighbour count**,
 because it applies regardless of neighbours.
 
+### `src/sim/stack.ts`
+
+Owns the bounded window of history — which Layers are retained and which are gone.
+
+A single ring buffer sized `width × height × maxDepth`, allocated once. **Retirement is not a delete**:
+the oldest slot is overwritten by the next push, which is what makes held memory constant by construction
+rather than by discipline. `layerAt(0)` is the newest Layer.
+
+`push()` **copies** the Grid rather than referencing it. `Simulation` reuses its Grid buffers between
+Generations, so a referencing Stack would silently turn every Layer into the current Generation — a
+failure that surfaces visually as "the structure is a solid extrusion of the present" and is very hard to
+trace back from the render.
+
+`generationAt(depth)` is **derived** as `newestGeneration − depth`, not stored. Exactly one Layer is
+pushed per Generation, so the derivation is exact; a parallel array would be a second source of truth.
+
+`layerAt()` returns a `subarray` **view**, not a copy — the renderer reads every Layer whenever the window
+changes. Callers must not mutate it.
+
+`set maxDepth` is the only allocating operation here, and it happens on a Viewer action rather than per
+Generation. It copies newest-first into slots `0..n`, so the new ring starts in a known layout instead of
+inheriting the old rotation.
+
+Exposes: `LayerStack`, `validateMaxDepth`.
+
 ### `src/sim/simulation.ts`
 
-Owns Run state: the current Grid, the generation counter, and Maximum Age.
+Owns Run state: the current Grid, the generation counter, Maximum Age, and the Stack.
 
 Holds two Grids allocated once at construction and swaps them on `advance()` — no allocation per
 Generation, because GC pauses read as stutter in a continuously animating product. `restart()` ends the
@@ -178,7 +206,14 @@ Setting `maximumAge` does **not** reach into the Grid to kill over-age Cells; th
 `advance()`, where the rule lives. Duplicating the rule in the setter would create two copies that
 eventually disagree.
 
-Exposes: `Simulation`, `SimulationOptions`, `RandomSource`, `DEFAULT_SEED_DENSITY`.
+`advance()` pushes the new Generation onto the Stack. `restart()` clears it and pushes the Seed — **a
+fresh Stack holds one Layer, not zero.** Generation 0 is a Generation like any other, and skipping it
+would leave the bottom of a new structure missing the state everything above it grew from. Issue #5's AC 4
+("restart empties the stack") and AC 1 ("each generation produces exactly one layer") pull against each
+other here; this is the deliberate resolution.
+
+Exposes: `Simulation`, `SimulationOptions`, `RandomSource`, `DEFAULT_SEED_DENSITY`,
+`DEFAULT_DEPTH_WINDOW`.
 
 ### `src/placeholder.ts`
 
