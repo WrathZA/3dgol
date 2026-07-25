@@ -28,6 +28,8 @@ export class LayerStack {
 	private writeSlot = 0;
 	/** Layers currently held, never above capacity. */
 	private layerCount = 0;
+	/** Generation of the newest Layer. Meaningless while the Stack is empty. */
+	private newestGenerationNumber = 0;
 
 	constructor(width: number, height: number, maxDepth: number) {
 		if (
@@ -70,16 +72,40 @@ export class LayerStack {
 	 * buffers between Generations, so holding a reference would mean every Layer
 	 * silently became the current Generation.
 	 */
-	push(grid: Grid): void {
+	push(grid: Grid, generation: number): void {
 		if (grid.width !== this.width || grid.height !== this.height) {
 			throw new Error(
 				`Grid is ${grid.width}x${grid.height}, stack holds ${this.width}x${this.height}`,
+			);
+		}
+		if (!Number.isInteger(generation) || generation < 0) {
+			throw new Error(
+				`Generation must be a non-negative integer, got ${generation}`,
 			);
 		}
 
 		this.buffer.set(grid.ages, this.writeSlot * this.cellsPerLayer);
 		this.writeSlot = (this.writeSlot + 1) % this.capacity;
 		this.layerCount = Math.min(this.layerCount + 1, this.capacity);
+		this.newestGenerationNumber = generation;
+	}
+
+	/**
+	 * The Generation a Layer represents — depth 0 is the newest.
+	 *
+	 * Derived rather than stored. Exactly one Layer is pushed per Generation, so
+	 * the Layer at depth d is `newestGeneration − d` by construction. Keeping a
+	 * parallel array of Generation numbers would be a second source of truth,
+	 * and the two would eventually disagree.
+	 */
+	generationAt(depth: number): number {
+		this.assertDepthHeld(depth);
+		return this.newestGenerationNumber - depth;
+	}
+
+	/** Generation of the newest Layer. Throws when the Stack is empty. */
+	get newestGeneration(): number {
+		return this.generationAt(0);
 	}
 
 	/**
@@ -90,11 +116,7 @@ export class LayerStack {
 	 * Callers must not mutate it.
 	 */
 	layerAt(depth: number): Uint16Array {
-		if (!Number.isInteger(depth) || depth < 0 || depth >= this.layerCount) {
-			throw new Error(
-				`No Layer at depth ${depth}; stack holds ${this.layerCount}`,
-			);
-		}
+		this.assertDepthHeld(depth);
 
 		const slot = this.slotAtDepth(depth);
 		const start = slot * this.cellsPerLayer;
@@ -106,6 +128,15 @@ export class LayerStack {
 		this.buffer.fill(0);
 		this.writeSlot = 0;
 		this.layerCount = 0;
+		this.newestGenerationNumber = 0;
+	}
+
+	private assertDepthHeld(depth: number): void {
+		if (!Number.isInteger(depth) || depth < 0 || depth >= this.layerCount) {
+			throw new Error(
+				`No Layer at depth ${depth}; stack holds ${this.layerCount}`,
+			);
+		}
 	}
 
 	/** Ring slot holding the Layer at `depth`, counting back from the newest. */
