@@ -28,6 +28,8 @@ export interface StructureMeshOptions {
 	width: number;
 	height: number;
 	depthWindow: number;
+	/** Age at which a Cell dies — the far end of the Colour Gradient. */
+	maximumAge: number;
 	/** Edge length of a drawn Cell, as a fraction of `CELL_SPACING`. */
 	cellScale?: number;
 }
@@ -43,6 +45,8 @@ export interface StructureMesh {
 	writeLayer(slot: number, ages: Uint16Array, birthGeneration: number): void;
 	/** Updates the per-frame uniforms the shader derives everything else from. */
 	setFrameState(currentGeneration: number, layerCount: number): void;
+	/** Retargets the Colour Gradient when Maximum Age changes. */
+	setMaximumAge(maximumAge: number): void;
 	/** Marks every instance unwritten, discarding the previous Run's Layers. */
 	resetLayers(): void;
 	dispose(): void;
@@ -58,6 +62,27 @@ export interface StructureMesh {
  * each Generation reads as its own stratum and you can see into the structure.
  */
 const DEFAULT_CELL_SCALE = 0.55;
+
+/**
+ * The Colour Gradient, birth on the left, death on the right.
+ *
+ * A Cell traverses this exactly once over its lifetime, so the palette is a
+ * countdown rather than decoration — the colour of a region tells you how long
+ * it has left, and a churning area reads differently from a settled one at a
+ * glance.
+ *
+ * Chosen to run cool-to-hot and to stay vivid against a dark background. The
+ * ends are deliberately far apart in hue *and* brightness: a viewer should be
+ * able to separate a newborn Cell from a dying one without having to compare
+ * them side by side.
+ */
+const GRADIENT_STOPS = [
+	0x7ef9e8, // birth — pale aqua
+	0x49b6ff, // settling in
+	0x7b6cff, // middle age — indigo
+	0xc44fe8, // violet
+	0xff5c7a, // death — hot pink
+] as const;
 
 /**
  * Instance index where a slot's Cells begin.
@@ -141,14 +166,16 @@ export function createStructureMesh(
 	// every frame.
 	const currentGenerationUniform = { value: 0 };
 	const layerCountUniform = { value: 0 };
+	const maximumAgeUniform = { value: options.maximumAge };
 
 	const material = new ShaderMaterial({
 		uniforms: {
 			uCurrentGeneration: currentGenerationUniform,
 			uLayerCount: layerCountUniform,
+			uMaximumAge: maximumAgeUniform,
 			uDepthWindow: { value: depthWindow },
 			uLayerSpacing: { value: LAYER_SPACING },
-			uCellColor: { value: new Color(0x8fd3ff) },
+			uGradient: { value: GRADIENT_STOPS.map((hex) => new Color(hex)) },
 		},
 		vertexShader: VERTEX_SHADER,
 		fragmentShader: FRAGMENT_SHADER,
@@ -187,6 +214,10 @@ export function createStructureMesh(
 		setFrameState(currentGeneration, layerCount) {
 			currentGenerationUniform.value = currentGeneration;
 			layerCountUniform.value = layerCount;
+		},
+
+		setMaximumAge(maximumAge) {
+			maximumAgeUniform.value = maximumAge;
 		},
 
 		/**
@@ -235,11 +266,13 @@ attribute float aAge;
 
 uniform float uCurrentGeneration;
 uniform float uLayerCount;
+uniform float uMaximumAge;
 uniform float uDepthWindow;
 uniform float uLayerSpacing;
 
 varying vec3 vNormal;
 varying vec2 vUv;
+varying float vAgeFraction;
 
 void main() {
 	float depth = uCurrentGeneration - aBirthGeneration;
@@ -255,6 +288,10 @@ void main() {
 
 	vNormal = normal;
 	vUv = uv;
+
+	// Age 1 is birth and uMaximumAge is death, so the gradient is traversed
+	// exactly once across a lifetime with neither end left unused.
+	vAgeFraction = clamp((aAge - 1.0) / max(uMaximumAge - 1.0, 1.0), 0.0, 1.0);
 
 	gl_Position = projectionMatrix * modelViewMatrix * vec4(placed, 1.0);
 }
@@ -272,10 +309,11 @@ void main() {
  * turn distant Cells into solid outline and near ones into a hairline.
  */
 const FRAGMENT_SHADER = /* glsl */ `
-uniform vec3 uCellColor;
+uniform vec3 uGradient[5];
 
 varying vec3 vNormal;
 varying vec2 vUv;
+varying float vAgeFraction;
 
 const vec3 LIGHT_DIRECTION = normalize(vec3(0.4, 1.0, 0.7));
 
@@ -284,7 +322,20 @@ const float EDGE_PIXELS = 1.2;
 /** How far the rim darkens the face colour. */
 const float EDGE_DARKEN = 0.35;
 
+/** Position along the Colour Gradient, interpolated between adjacent stops. */
+vec3 gradientColor(float t) {
+	float scaled = clamp(t, 0.0, 1.0) * 4.0;
+	int index = int(floor(scaled));
+	// The last stop has no successor to blend toward.
+	if (index >= 4) {
+		return uGradient[4];
+	}
+	return mix(uGradient[index], uGradient[index + 1], scaled - float(index));
+}
+
 void main() {
+	vec3 base = gradientColor(vAgeFraction);
+
 	float facing = dot(normalize(vNormal), LIGHT_DIRECTION) * 0.5 + 0.5;
 	// Floor well above zero so downward faces stay legible rather than reading
 	// as holes in the structure.
@@ -295,6 +346,6 @@ void main() {
 	float rim = smoothstep(0.0, fwidth(border) * EDGE_PIXELS, border);
 	shade *= mix(EDGE_DARKEN, 1.0, rim);
 
-	gl_FragColor = vec4(uCellColor * shade, 1.0);
+	gl_FragColor = vec4(base * shade, 1.0);
 }
 `;

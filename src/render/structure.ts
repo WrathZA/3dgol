@@ -34,6 +34,7 @@ export function createStructureView(simulation: Simulation): StructureView {
 		width: simulation.width,
 		height: simulation.height,
 		depthWindow,
+		maximumAge: simulation.maximumAge,
 	});
 
 	const writeNewest = (): void => {
@@ -61,6 +62,10 @@ export function createStructureView(simulation: Simulation): StructureView {
 
 		syncFrameState() {
 			structure.setFrameState(simulation.generation, simulation.stack.depth);
+			// Maximum Age becomes a Viewer control later; reading it each frame
+			// means the gradient retargets the moment it changes, with no
+			// separate notification to wire up.
+			structure.setMaximumAge(simulation.maximumAge);
 		},
 
 		reset() {
