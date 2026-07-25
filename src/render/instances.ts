@@ -8,7 +8,7 @@ import {
 	ShaderMaterial,
 } from "three";
 
-import { CELL_SPACING, LAYER_SPACING } from "@/render/scene";
+import { BACKGROUND_COLOR, CELL_SPACING, LAYER_SPACING } from "@/render/scene";
 
 /**
  * The whole Stack as a single instanced draw.
@@ -28,6 +28,8 @@ export interface StructureMeshOptions {
 	width: number;
 	height: number;
 	depthWindow: number;
+	/** Age at which a Cell dies — the far end of the Colour Gradient. */
+	maximumAge: number;
 	/** Edge length of a drawn Cell, as a fraction of `CELL_SPACING`. */
 	cellScale?: number;
 }
@@ -43,29 +45,60 @@ export interface StructureMesh {
 	writeLayer(slot: number, ages: Uint16Array, birthGeneration: number): void;
 	/** Updates the per-frame uniforms the shader derives everything else from. */
 	setFrameState(currentGeneration: number, layerCount: number): void;
+	/** Retargets the Colour Gradient when Maximum Age changes. */
+	setMaximumAge(maximumAge: number): void;
 	/** Marks every instance unwritten, discarding the previous Run's Layers. */
 	resetLayers(): void;
 	dispose(): void;
 }
 
 /**
- * Default fraction of a Cell's spacing that the drawn box occupies.
+ * Edge length of a drawn Cell, as a fraction of the lattice spacing.
  *
- * Well under 1 on purpose. At near-touching sizes a busy Generation becomes an
- * unbroken sheet, and the whole point is that dead positions draw nothing — a
- * structure you cannot see into has no shape.
+ * A Cell is a cube on an isotropic lattice, so this one number sets the gap in
+ * every direction at once. It is the most consequential value in the codebase:
+ * near 1, Cells touch and the Stack fuses into a solid mass — history becomes
+ * invisible, which is the one thing this product exists to show. Around half,
+ * each Generation reads as its own stratum and you can see into the structure.
  */
-const DEFAULT_CELL_SCALE = 0.6;
+const DEFAULT_CELL_SCALE = 0.55;
 
 /**
- * Height of a drawn Cell as a fraction of the distance between Layers.
+ * The Colour Gradient, birth on the left, death on the right.
  *
- * The single most important number for whether the product works. Near 1, Layers
- * touch and the Stack fuses into one solid mass — history becomes invisible,
- * which is the one thing this product exists to show. Well under half, each
- * Generation reads as its own stratum with clear space above and below it.
+ * A Cell traverses this exactly once over its lifetime, so the palette is a
+ * countdown rather than decoration — the colour of a region tells you how long
+ * it has left, and a churning area reads differently from a settled one at a
+ * glance.
+ *
+ * Chosen to run cool-to-hot and to stay vivid against a dark background. The
+ * ends are deliberately far apart in hue *and* brightness: a viewer should be
+ * able to separate a newborn Cell from a dying one without having to compare
+ * them side by side.
  */
-const LAYER_THICKNESS_RATIO = 0.4;
+const GRADIENT_STOPS = [
+	0x7ef9e8, // birth — pale aqua
+	0x5cc8ff, // settling in
+	0x9a8cff, // middle age — indigo
+	0xd873f5, // violet
+	0xff6b86, // death — hot pink
+] as const;
+
+/**
+ * How many stops the fragment shader is written to expect.
+ *
+ * GLSL uniform arrays need a compile-time size, so the count appears both here
+ * and literally in the shader. Adding a stop without updating the shader would
+ * otherwise fail silently — the extra colour simply never appearing. This makes
+ * the mismatch throw at construction instead.
+ */
+const GRADIENT_STOP_COUNT = 5;
+
+if (GRADIENT_STOPS.length !== GRADIENT_STOP_COUNT) {
+	throw new Error(
+		`Colour Gradient has ${GRADIENT_STOPS.length} stops; the shader declares ${GRADIENT_STOP_COUNT}`,
+	);
+}
 
 /**
  * Instance index where a slot's Cells begin.
@@ -109,11 +142,9 @@ export function createStructureMesh(
 	const instanceCount = cellsPerLayer * depthWindow;
 
 	const geometry = new InstancedBufferGeometry();
-	const box = new BoxGeometry(
-		cellScale * CELL_SPACING,
-		LAYER_SPACING * LAYER_THICKNESS_RATIO,
-		cellScale * CELL_SPACING,
-	);
+	// A cube: equal on every axis, because the lattice is isotropic.
+	const edge = cellScale * CELL_SPACING;
+	const box = new BoxGeometry(edge, edge, edge);
 	geometry.index = box.index;
 	geometry.attributes = box.attributes;
 	geometry.instanceCount = instanceCount;
@@ -151,14 +182,17 @@ export function createStructureMesh(
 	// every frame.
 	const currentGenerationUniform = { value: 0 };
 	const layerCountUniform = { value: 0 };
+	const maximumAgeUniform = { value: options.maximumAge };
 
 	const material = new ShaderMaterial({
 		uniforms: {
 			uCurrentGeneration: currentGenerationUniform,
 			uLayerCount: layerCountUniform,
+			uMaximumAge: maximumAgeUniform,
 			uDepthWindow: { value: depthWindow },
 			uLayerSpacing: { value: LAYER_SPACING },
-			uCellColor: { value: new Color(0x8fd3ff) },
+			uGradient: { value: GRADIENT_STOPS.map((hex) => new Color(hex)) },
+			uBackground: { value: new Color(BACKGROUND_COLOR) },
 		},
 		vertexShader: VERTEX_SHADER,
 		fragmentShader: FRAGMENT_SHADER,
@@ -197,6 +231,10 @@ export function createStructureMesh(
 		setFrameState(currentGeneration, layerCount) {
 			currentGenerationUniform.value = currentGeneration;
 			layerCountUniform.value = layerCount;
+		},
+
+		setMaximumAge(maximumAge) {
+			maximumAgeUniform.value = maximumAge;
 		},
 
 		/**
@@ -245,10 +283,30 @@ attribute float aAge;
 
 uniform float uCurrentGeneration;
 uniform float uLayerCount;
+uniform float uMaximumAge;
 uniform float uDepthWindow;
 uniform float uLayerSpacing;
 
 varying vec3 vNormal;
+varying vec2 vUv;
+varying float vAgeFraction;
+varying float vSunk;
+
+/**
+ * Where the descent starts to show, as a fraction of the Depth Window.
+ *
+ * Below this the Stack keeps full presence, so most of the structure is read at
+ * full strength and only the oldest part dissolves.
+ */
+const float FADE_START = 0.55;
+
+/**
+ * Shapes how Age maps onto the Colour Gradient.
+ *
+ * Below 1 pushes early Ages further along the palette. Exactly 1 would be a
+ * linear map, which wastes most of the gradient given how Life distributes Age.
+ */
+const float AGE_GRADIENT_CURVE = 0.45;
 
 void main() {
 	float depth = uCurrentGeneration - aBirthGeneration;
@@ -259,36 +317,100 @@ void main() {
 
 	float y = (uLayerCount - 1.0 - depth) * uLayerSpacing;
 
-	vec3 placed = position * (visible ? 1.0 : 0.0)
+	// How far through the Depth Window this Layer has sunk: 0 at the top, 1 as
+	// it leaves the bottom.
+	float sunk = clamp(depth / max(uDepthWindow - 1.0, 1.0), 0.0, 1.0);
+	vSunk = sunk;
+
+	// Shrink over the last stretch as well as fading, so a Layer dissolves
+	// rather than simply dimming in place. Retirement is then never a pop —
+	// by the time a slot is recycled its Cells have already shrunk away.
+	float shrink = 1.0 - smoothstep(FADE_START, 1.0, sunk);
+
+	vec3 placed = position * (visible ? shrink : 0.0)
 		+ vec3(aGridPosition.x, y, aGridPosition.y);
 
 	vNormal = normal;
+	vUv = uv;
+
+	// Age 1 is birth and uMaximumAge is death, so the gradient is traversed
+	// exactly once across a lifetime with neither end left unused.
+	float lifetime = clamp((aAge - 1.0) / max(uMaximumAge - 1.0, 1.0), 0.0, 1.0);
+
+	// Life's Cell ages are heavily skewed young — most Cells die within a few
+	// Generations and only settled regions grow old. Mapping age linearly leaves
+	// the far end of the palette almost unused and paints nearly everything the
+	// birth colour. This curve spreads the early ages across more of the
+	// gradient, where most Cells actually live, without moving either endpoint.
+	vAgeFraction = pow(lifetime, AGE_GRADIENT_CURVE);
 
 	gl_Position = projectionMatrix * modelViewMatrix * vec4(placed, 1.0);
 }
 `;
 
 /**
- * One colour, shaded by which way a face points.
+ * Face shading plus a drawn edge on every Cell.
  *
- * Colour as meaning belongs to the next issue. What this has to do is make the
- * structure read as solid forms rather than a flat silhouette — every face the
- * same brightness would turn a field of boxes into one undifferentiated mass.
- * A fixed direction is enough; there is no light in the scene to configure.
+ * Two separate jobs. Directional shading separates the faces of one cube so it
+ * reads as a solid form. The edge separates *adjacent* cubes — without it, two
+ * neighbours sharing a colour merge into one shape and the lattice disappears.
+ *
+ * The rim is widened by `fwidth`, so it stays roughly a constant number of
+ * pixels whether a Cell is close or far away. A fixed width in UV space would
+ * turn distant Cells into solid outline and near ones into a hairline.
  */
 const FRAGMENT_SHADER = /* glsl */ `
-uniform vec3 uCellColor;
+uniform vec3 uGradient[5];
+uniform vec3 uBackground;
 
 varying vec3 vNormal;
+varying vec2 vUv;
+varying float vAgeFraction;
+varying float vSunk;
+
+/** Matches the vertex shader — the two must dissolve together. */
+const float FADE_START = 0.55;
 
 const vec3 LIGHT_DIRECTION = normalize(vec3(0.4, 1.0, 0.7));
 
+/** Rim width in pixels. */
+const float EDGE_PIXELS = 1.2;
+/** How far the rim darkens the face colour. */
+const float EDGE_DARKEN = 0.35;
+
+/** Position along the Colour Gradient, interpolated between adjacent stops. */
+vec3 gradientColor(float t) {
+	float scaled = clamp(t, 0.0, 1.0) * 4.0;
+	int index = int(floor(scaled));
+	// The last stop has no successor to blend toward.
+	if (index >= 4) {
+		return uGradient[4];
+	}
+	return mix(uGradient[index], uGradient[index + 1], scaled - float(index));
+}
+
 void main() {
+	vec3 base = gradientColor(vAgeFraction);
+
 	float facing = dot(normalize(vNormal), LIGHT_DIRECTION) * 0.5 + 0.5;
 	// Floor well above zero so downward faces stay legible rather than reading
-	// as holes in the structure.
-	float shade = mix(0.45, 1.0, facing);
+	// as holes. Kept high because face shading, the edge rim, and the depth fade
+	// all darken the same pixel — compounded, a low floor turns the middle of
+	// the structure to mud.
+	float shade = mix(0.6, 1.0, facing);
 
-	gl_FragColor = vec4(uCellColor * shade, 1.0);
+	// Distance to the nearest border of this face, in UV space.
+	float border = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+	float rim = smoothstep(0.0, fwidth(border) * EDGE_PIXELS, border);
+	shade *= mix(EDGE_DARKEN, 1.0, rim);
+
+	// Mixing toward the background rather than using alpha keeps every Cell
+	// opaque, so depth sorting stays correct. Against a flat background the two
+	// are indistinguishable — and 138,000 unsorted transparent instances would
+	// punch holes through each other.
+	float fade = smoothstep(FADE_START, 1.0, vSunk);
+	vec3 lit = mix(base * shade, uBackground, fade);
+
+	gl_FragColor = vec4(lit, 1.0);
 }
 `;

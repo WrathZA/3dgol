@@ -1,4 +1,4 @@
-import { PerspectiveCamera, Scene, WebGLRenderer } from "three";
+import { Color, PerspectiveCamera, Scene, WebGLRenderer } from "three";
 
 /**
  * Renderer, scene, and camera for the structure.
@@ -8,18 +8,31 @@ import { PerspectiveCamera, Scene, WebGLRenderer } from "three";
  * looking straight down an axis would flatten a diagonal streak into a dot.
  */
 
+/**
+ * What the structure is drawn against, and what descending Layers fade into.
+ *
+ * Shared deliberately: the renderer clears to this colour and the shader mixes
+ * toward it, so a Layer reaching the bottom of the window lands exactly on the
+ * background and vanishes. If the two ever diverge, the "dissolve" becomes a
+ * visible grey floor.
+ */
+export const BACKGROUND_COLOR = 0x080a11;
+
 /** World units between adjacent Cells within a Layer. */
 export const CELL_SPACING = 1;
 
 /**
  * World units between adjacent Layers.
  *
- * Less than `CELL_SPACING`, so a deep Stack does not become a tower far taller
- * than it is wide — but not so much less that Layers collapse into each other.
- * A drawn Cell occupies well under this distance (see `LAYER_THICKNESS_RATIO`),
- * which is what keeps the strata separately visible.
+ * Equal to `CELL_SPACING`, making the lattice isotropic: a Cell is a cube and
+ * the gap above it matches the gap beside it. Drawn Cells occupy well under this
+ * distance (see `CELL_SCALE`), which is what keeps Layers visible as separate
+ * strata rather than fusing into one solid mass.
+ *
+ * The Stack ends up taller than it is wide at the default Depth Window. That is
+ * fine — the camera frames from the structure's extent, so it follows.
  */
-export const LAYER_SPACING = 0.7;
+export const LAYER_SPACING = 1;
 
 export interface StructureExtent {
 	width: number;
@@ -51,6 +64,7 @@ export function createScene(
 ): SceneHandle {
 	const renderer = new WebGLRenderer({ canvas, antialias: true });
 	renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
+	renderer.setClearColor(new Color(BACKGROUND_COLOR), 1);
 
 	const scene = new Scene();
 
