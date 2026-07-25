@@ -55,6 +55,41 @@ export class LayerStack {
 		return this.capacity;
 	}
 
+	/**
+	 * Resizes the Depth Window, keeping as much held history as the new size allows.
+	 *
+	 * Lowering trims from the oldest end — the newest Layers are the ones a Viewer
+	 * is watching, so they are the ones worth keeping. Raising preserves everything
+	 * currently held and lets the Stack grow into the new room.
+	 *
+	 * This reallocates, and it is the only operation here that does. That is
+	 * acceptable because it happens on a Viewer action, not per Generation — the
+	 * per-Generation path stays allocation-free.
+	 */
+	set maxDepth(value: number) {
+		const nextCapacity = validateMaxDepth(value);
+		if (nextCapacity === this.capacity) {
+			return;
+		}
+
+		const retained = Math.min(this.layerCount, nextCapacity);
+		const nextBuffer = new Uint16Array(this.cellsPerLayer * nextCapacity);
+
+		// Copy newest-first into slots 0..retained-1, so the new ring starts in a
+		// known layout rather than inheriting the old ring's rotation.
+		for (let depth = 0; depth < retained; depth++) {
+			nextBuffer.set(
+				this.layerAt(depth),
+				(retained - 1 - depth) * this.cellsPerLayer,
+			);
+		}
+
+		this.buffer = nextBuffer;
+		this.capacity = nextCapacity;
+		this.layerCount = retained;
+		this.writeSlot = retained % nextCapacity;
+	}
+
 	/** Layers currently held. Climbs to `maxDepth` and stays there. */
 	get depth(): number {
 		return this.layerCount;
