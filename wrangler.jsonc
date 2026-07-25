@@ -1,0 +1,16 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "3dgol",
+	"compatibility_date": "2026-07-25",
+
+	// Static assets only — this project has no server-side code and no Worker
+	// script. Cloudflare serves the built `dist/` directory directly.
+	"assets": {
+		"directory": "./dist",
+
+		// The product is a single page with no client-side routing. A request for
+		// an unknown path returns the 404 page rather than silently serving the
+		// app, so a broken link reads as broken instead of as a blank product.
+		"not_found_handling": "404-page"
+	}
+}
