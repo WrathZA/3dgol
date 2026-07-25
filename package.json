@@ -1,0 +1,22 @@
+{
+  "name": "3dgol",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Conway's Game of Life with the time axis drawn — each generation stacked as a layer.",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "biome check --write",
+    "lint": "biome check",
+    "typecheck": "tsc --noEmit",
+    "deploy": "wrangler deploy"
+  }
+}
