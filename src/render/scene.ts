@@ -1,4 +1,5 @@
 import { Color, PerspectiveCamera, Scene, WebGLRenderer } from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 /**
  * Renderer, scene, and camera for the structure.
@@ -44,6 +45,7 @@ export interface SceneHandle {
 	renderer: WebGLRenderer;
 	scene: Scene;
 	camera: PerspectiveCamera;
+	controls: OrbitControls;
 	/** Re-reads the canvas size and updates the camera and drawing buffer. */
 	resize(): void;
 	dispose(): void;
@@ -71,6 +73,21 @@ export function createScene(
 	const camera = new PerspectiveCamera(50, 1, 0.1, 4000);
 	frameStructure(camera, extent);
 
+	const controls = new OrbitControls(camera, canvas);
+	// Damping gives the structure weight — it keeps moving briefly after a drag
+	// ends rather than stopping dead. It requires `update()` every frame.
+	controls.enableDamping = true;
+	controls.dampingFactor = 0.08;
+
+	// Look at the middle of the Stack's height rather than its base, matching
+	// where `frameStructure` aimed the camera.
+	const stackHeight = extent.depthWindow * LAYER_SPACING;
+	controls.target.set(0, stackHeight * 0.5, 0);
+
+	// Deliberately *not* clamping the polar angle. Many projects stop the camera
+	// passing under the floor; here "from below" is an acceptance criterion, and
+	// the underside of the Stack is worth seeing.
+
 	const resize = (): void => {
 		const width = canvas.clientWidth;
 		const height = canvas.clientHeight;
@@ -89,8 +106,10 @@ export function createScene(
 		renderer,
 		scene,
 		camera,
+		controls,
 		resize,
 		dispose: () => {
+			controls.dispose();
 			renderer.dispose();
 		},
 	};
