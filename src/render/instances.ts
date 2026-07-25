@@ -78,10 +78,10 @@ const DEFAULT_CELL_SCALE = 0.55;
  */
 const GRADIENT_STOPS = [
 	0x7ef9e8, // birth — pale aqua
-	0x49b6ff, // settling in
-	0x7b6cff, // middle age — indigo
-	0xc44fe8, // violet
-	0xff5c7a, // death — hot pink
+	0x5cc8ff, // settling in
+	0x9a8cff, // middle age — indigo
+	0xd873f5, // violet
+	0xff6b86, // death — hot pink
 ] as const;
 
 /**
@@ -284,6 +284,14 @@ varying float vSunk;
  */
 const float FADE_START = 0.55;
 
+/**
+ * Shapes how Age maps onto the Colour Gradient.
+ *
+ * Below 1 pushes early Ages further along the palette. Exactly 1 would be a
+ * linear map, which wastes most of the gradient given how Life distributes Age.
+ */
+const float AGE_GRADIENT_CURVE = 0.45;
+
 void main() {
 	float depth = uCurrentGeneration - aBirthGeneration;
 
@@ -311,7 +319,14 @@ void main() {
 
 	// Age 1 is birth and uMaximumAge is death, so the gradient is traversed
 	// exactly once across a lifetime with neither end left unused.
-	vAgeFraction = clamp((aAge - 1.0) / max(uMaximumAge - 1.0, 1.0), 0.0, 1.0);
+	float lifetime = clamp((aAge - 1.0) / max(uMaximumAge - 1.0, 1.0), 0.0, 1.0);
+
+	// Life's Cell ages are heavily skewed young — most Cells die within a few
+	// Generations and only settled regions grow old. Mapping age linearly leaves
+	// the far end of the palette almost unused and paints nearly everything the
+	// birth colour. This curve spreads the early ages across more of the
+	// gradient, where most Cells actually live, without moving either endpoint.
+	vAgeFraction = pow(lifetime, AGE_GRADIENT_CURVE);
 
 	gl_Position = projectionMatrix * modelViewMatrix * vec4(placed, 1.0);
 }
@@ -363,8 +378,10 @@ void main() {
 
 	float facing = dot(normalize(vNormal), LIGHT_DIRECTION) * 0.5 + 0.5;
 	// Floor well above zero so downward faces stay legible rather than reading
-	// as holes in the structure.
-	float shade = mix(0.45, 1.0, facing);
+	// as holes. Kept high because face shading, the edge rim, and the depth fade
+	// all darken the same pixel — compounded, a low floor turns the middle of
+	// the structure to mud.
+	float shade = mix(0.6, 1.0, facing);
 
 	// Distance to the nearest border of this face, in UV space.
 	float border = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
