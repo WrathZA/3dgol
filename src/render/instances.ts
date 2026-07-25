@@ -88,6 +88,15 @@ export interface StructureMesh {
 	setSlotCount(slots: number): void;
 	/** Marks every instance unwritten, discarding the previous Run's Layers. */
 	resetLayers(): void;
+	/**
+	 * Marks the whole instance buffer for upload.
+	 *
+	 * Needed after rewriting more than one Layer in a batch. `writeLayer` narrows
+	 * the upload to the single slot it touched, which is the point of it — but
+	 * that means the last write in a batch would be the only one to reach the
+	 * GPU, leaving the rest of the ring showing whatever it held before.
+	 */
+	uploadAll(): void;
 	dispose(): void;
 }
 
@@ -259,6 +268,15 @@ export function createStructureMesh(
 	// meaningful bounding volume — without this the whole structure is culled.
 	mesh.frustumCulled = false;
 
+	// An empty set of update ranges means the whole buffer, which is what
+	// three.js falls back to when none has been added.
+	const uploadAll = (): void => {
+		birthAttribute.clearUpdateRanges();
+		birthAttribute.needsUpdate = true;
+		ageAttribute.clearUpdateRanges();
+		ageAttribute.needsUpdate = true;
+	};
+
 	return {
 		mesh,
 
@@ -323,12 +341,10 @@ export function createStructureMesh(
 		resetLayers() {
 			birthGenerations.fill(-1);
 			ages.fill(0);
-
-			birthAttribute.clearUpdateRanges();
-			birthAttribute.needsUpdate = true;
-			ageAttribute.clearUpdateRanges();
-			ageAttribute.needsUpdate = true;
+			uploadAll();
 		},
+
+		uploadAll,
 
 		dispose() {
 			box.dispose();

@@ -26,9 +26,9 @@ export const CELL_SPACING = 1;
  * World units between adjacent Layers.
  *
  * Equal to `CELL_SPACING`, making the lattice isotropic: a Cell is a cube and
- * the gap above it matches the gap beside it. Drawn Cells occupy well under this
- * distance (see `CELL_SCALE`), which is what keeps Layers visible as separate
- * strata rather than fusing into one solid mass.
+ * the gap above it matches the gap beside it. How much of this distance a drawn
+ * Cell occupies is Cell Size, which the Viewer controls — below 1 the Layers
+ * read as separate strata, and at 1 they fuse into one solid mass.
  *
  * The Stack ends up taller than it is wide at the default Depth Window. That is
  * fine — the camera frames from the structure's extent, so it follows.
@@ -48,6 +48,19 @@ export interface SceneHandle {
 	controls: OrbitControls;
 	/** Re-reads the canvas size and updates the camera and drawing buffer. */
 	resize(): void;
+	/**
+	 * Re-aims the orbit centre and the retreat limit at a Stack of a new height.
+	 *
+	 * The camera's own position is deliberately left where the Viewer put it, so
+	 * this is a change of what is framed rather than a move. Both values are
+	 * derived from the Stack's height, so leaving them behind after the Viewer
+	 * changes the Depth Window has visible consequences at either end: a shortened
+	 * structure hangs low in an empty frame, and a lengthened one cannot be
+	 * retreated from far enough to see whole.
+	 *
+	 * Fractional values are expected — this follows the Depth Window as it eases.
+	 */
+	setDepthWindow(depthWindow: number): void;
 	dispose(): void;
 }
 
@@ -98,23 +111,35 @@ export function createScene(
 	controls.enableDamping = true;
 	controls.dampingFactor = 0.08;
 
-	// Look at the middle of the Stack's height rather than its base, matching
-	// where `frameStructure` aimed the camera.
-	const stackHeight = extent.depthWindow * LAYER_SPACING;
-	controls.target.set(0, stackHeight * 0.5, 0);
-
 	// Deliberately *not* clamping the polar angle. Many projects stop the camera
 	// passing under the floor; here "from below" is an acceptance criterion, and
 	// the underside of the Stack is worth seeing.
 
-	// Both limits are derived from the structure rather than picked by feel,
-	// because each one can fail a criterion on its own. Too far a near limit and
-	// individual Cells never become legible; too near a far limit and the whole
-	// silhouette never fits in frame.
-	const footprint = Math.max(extent.width, extent.height) * CELL_SPACING;
-	const reach = Math.max(footprint, stackHeight);
+	// The near limit is derived from the structure rather than picked by feel,
+	// because it can fail a criterion on its own: too far, and individual Cells
+	// never become legible.
 	controls.minDistance = CELL_SPACING * NEAREST_APPROACH_IN_CELLS;
-	controls.maxDistance = reach * FURTHEST_RETREAT_IN_REACHES;
+
+	/**
+	 * Aims at the middle of the Stack's height rather than its base, matching
+	 * where `frameStructure` pointed the camera, and sets how far back the Viewer
+	 * may retreat — too near a far limit and the whole silhouette never fits.
+	 *
+	 * The target follows the Depth Window but never the *growing* Stack: it sits
+	 * at the mid-height of a full Stack, so while the Stack fills the structure
+	 * sits low in frame and rises into place. Following the growth itself would
+	 * drift the frame under the Viewer between Generations.
+	 */
+	const setDepthWindow = (depthWindow: number): void => {
+		const stackHeight = depthWindow * LAYER_SPACING;
+		const footprint = Math.max(extent.width, extent.height) * CELL_SPACING;
+		const reach = Math.max(footprint, stackHeight);
+
+		controls.target.set(0, stackHeight * 0.5, 0);
+		controls.maxDistance = reach * FURTHEST_RETREAT_IN_REACHES;
+	};
+
+	setDepthWindow(extent.depthWindow);
 
 	const resize = (): void => {
 		const width = canvas.clientWidth;
@@ -136,6 +161,7 @@ export function createScene(
 		camera,
 		controls,
 		resize,
+		setDepthWindow,
 		dispose: () => {
 			controls.dispose();
 			renderer.dispose();
