@@ -4,14 +4,16 @@ Live map of project layout, components, and patterns. Seeded at bootstrap; updat
 
 ## Current state
 
-**The product renders.** Generations accumulate into a structure you can look at.
+**The product renders, and you can now change it while it runs.** Generations accumulate into a structure
+you can look at, walk around, and adjust.
 
 Issue #3 scaffolded the project and proved the deployment path. #4 built the simulation, #5 the bounded
-history window, #6 drew it, #8 gave it colour, fade, and cubic edge-drawn cells, and #7 made it something
-you can walk around.
+history window, #6 drew it, #8 gave it colour, fade, and cubic edge-drawn cells, #7 made it something you
+can walk around, and #9 gave it a control panel for Speed, Depth Window, Maximum Age, and Cell Size.
 
-Not yet built: any controls (#9, #10), phone layout (#11), the drawing budget (#12), and link previews
-(#13). Nothing can be adjusted at runtime — deliberate, and owned by those issues.
+Not yet built: Grid dimensions and Restart (#10), phone layout (#11), the drawing budget (#12), and link
+previews (#13). The panel is desktop-only in its layout, and the Depth Window ceiling it permits is
+unmeasured — both deliberate, and owned by those issues.
 
 What is built:
 
@@ -38,17 +40,21 @@ Everything under "Planned layout" below that is not listed above is still unbuil
 ```
 index.html            Full-viewport canvas (#viewport), meta tags, minimal inline CSS
 src/
-  main.ts             Composition root — rAF loop, accumulator-driven generations
-  settings.ts         Starting values for grid, depth, maximum age, and speed
+  main.ts             Composition root — rAF loop, settings diff, Depth Window travel
+  settings.ts         Starting values, live setting bounds, clamping
   sim/                Pure simulation — imports nothing outside itself
     grid.ts           Grid storage, index arithmetic, Bounded Edge, neighbour counting
     rules.ts          B3/S23 + age increment + Death by Old Age
     stack.ts          LayerStack — ring buffer, Depth Window, retirement
     simulation.ts     Run state — generation counter, Maximum Age, Stack, advance(), restart()
+    clock.ts          Elapsed time to Generations — pause, resume, backgrounded-tab cap
   render/             Drawing — may read the simulation, never the reverse
-    scene.ts          Renderer, camera, OrbitControls, resize, spacing constants
-    instances.ts      Instanced geometry, GLSL shaders, ring slot arithmetic
-    structure.ts      Binds a Run's Stack to the instance buffer
+    scene.ts          Renderer, camera, OrbitControls, resize, reframe on Depth Window
+    instances.ts      Instanced geometry, GLSL shaders, ring slot arithmetic, uniforms
+    structure.ts      Binds a Run's Stack to the instance buffer; re-lays the ring
+  ui/                 Control surface — mutates settings, knows nothing else
+    panel.ts          The four live controls, built from native range inputs
+    panel.css         Panel styling
 e2e/
   smoke.mjs           Headless render + screenshot — local only, never CI
 tests/
@@ -58,8 +64,10 @@ tests/
     rules.test.ts     Golden Life patterns, Age semantics, Death by Old Age
     stack.test.ts     Retirement, Depth Window resize, constant memory, copy-not-reference
     simulation.test.ts Run lifecycle, Seed density, determinism, Maximum Age, Stack integration
+    clock.test.ts     Pause banks nothing, resume has no burst, long gaps are capped
   render/
-    instances.test.ts Ring slot arithmetic — the only testable part of rendering
+    instances.test.ts Ring slot arithmetic and Stack placement height
+  settings.test.ts    Setting bounds, step snapping, clamping
 biome.json            Scoped to src/, tests/, and config files only
 vite.config.ts        @/ alias + Vitest config (tests live in tests/**/*.test.ts)
 tsconfig.json         strict, noUncheckedIndexedAccess, @/ paths
@@ -118,6 +126,15 @@ ui  ──▶  settings  ◀──  main  ──▶  render  ──▶  sim
 mutates the settings object and knows nothing about either. `main.ts` is the only module that wires them
 together.
 
+**`render/` deliberately does not import `settings`.** It would be convenient — `instances.ts` needs the
+Depth Window ceiling to size the ring — and it would add an edge to the graph above. Instead `main.ts`
+passes `ringCapacity` in. Every value the renderer needs from a setting arrives as an argument.
+
+**How a moved slider reaches the thing it changes.** The panel writes into the settings object on `input`,
+so a value is live mid-drag. `main.ts` compares four scalars per frame against what it has applied and acts
+on the difference — constant work regardless of instance count. Nothing observes, subscribes, or notifies:
+the interface would otherwise need opinions about what each setting affects.
+
 The hard rule: **`src/sim/` must never import three.js, touch the DOM, or reference rendering concepts.**
 This is what makes the simulation unit-testable, and it is the first thing to check when a change to
 `sim/` becomes difficult to test.
@@ -134,8 +151,9 @@ would discard the main advantage of this design.
 
 ### Derive-from-uniform
 
-**Implemented in #6.** Each instance carries its grid position (written once), birth generation, and age.
-Per frame, exactly two uniforms change: `uCurrentGeneration` and `uLayerCount`. The vertex shader derives:
+**Implemented in #6, completed in #9.** Each instance carries its grid position (written once), birth
+generation, and age. Per frame, exactly two uniforms change: `uCurrentGeneration` and `uLayerCount`.
+Viewer settings change three more, but only when moved. The vertex shader derives:
 
 | Derived | From | State |
 |---------|------|-------|
@@ -143,7 +161,12 @@ Per frame, exactly two uniforms change: `uCurrentGeneration` and `uLayerCount`. 
 | Visibility | Age above zero, birth generation written, and depth inside the window | built |
 | Dissolve | A fade toward `BACKGROUND_COLOR` plus a shrink, both over depth | built |
 | Colour | Age along `GRADIENT_STOPS`, curved by `AGE_GRADIENT_CURVE` | built |
-| Scale | The cell-size setting | #9 |
+| Scale | `uCellSize`, scaling a unit cube | built |
+
+`uLayerCount` is **not** simply the Stack's held depth — see `drawnLayerCount`. A narrowed Depth Window
+travels toward its new value while the Stack still holds the Layers being given up, so the height Layers
+are measured against is `min(heldLayers, drawnDepthWindow)`. Using the held depth instead drops the whole
+structure the moment those Layers are finally released.
 
 The height formula produces the two phases the PRD describes: while the Stack fills, `layerCount` grows
 and the structure genuinely rises; once full it holds, and each Layer sinks a step per Generation until it
@@ -264,10 +287,17 @@ dissolve becomes a visible grey floor.**
 
 Owns the single instanced draw and the shaders that place it.
 
-**`DEFAULT_CELL_SCALE` (0.55) is the most consequential number in the codebase.** On an isotropic lattice
+**`DEFAULT_CELL_SIZE` (0.55) is the most consequential number in the codebase.** On an isotropic lattice
 it sets the gap in every direction at once. Near 1, Cells touch and the Stack fuses into one solid mass —
 history becomes invisible, which is the one thing this product exists to show. This was shipped wrong once
-and caught only by screenshotting it; every automated check passed.
+and caught only by screenshotting it; every automated check passed. Since #9 it is a Viewer control and a
+`uCellSize` uniform scaling a unit cube, so it is now a *default* rather than a constant — and a Viewer can
+deliberately drive the Stack to that solid mass, which is the point of the control.
+
+**Two windows, not one.** `setDepthWindow` sets what the shader fades and cuts against and takes fractional
+values, because it is eased. `setSlotCount` sets how many ring slots are drawn and must cover every slot
+the ring assigns. Collapsing them is the obvious simplification and it is wrong: a Layer written to a high
+slot would stop being drawn however new it is.
 
 **`GRADIENT_STOPS`** is the Colour Gradient, birth to death. A Cell traverses it exactly once over its
 lifetime, so the palette is a countdown rather than decoration.
@@ -300,11 +330,43 @@ Owns the bookkeeping between a Run's Stack and the instance buffer — which slo
 when a slot needs rewriting. One Layer written per Generation, one uniform per frame, never anything
 proportional to Stack size.
 
+**`relayRing()` is the one exception, and it is allowed to be.** A Generation's slot is
+`generation % maxDepth`, so a changed Depth Window moves every held Layer, and all of them are rewritten.
+That is proportional to Stack size — acceptable only because it happens on a Viewer action and nowhere
+else. It allocates nothing.
+
+**A batch rewrite must end with `uploadAll()`.** `writeLayer` narrows the upload to the single slot it
+touched, which is the whole point of it; without a final full upload, only the last Layer of a batch
+reaches the GPU and the rest of the ring shows the layout it just replaced.
+
+### `src/sim/clock.ts`
+
+Turns elapsed time into Generations. Pure, and in `sim/` because pacing a Run is simulation, not rendering.
+
+Exists as a module rather than inline in the loop because pause is where the subtle bug lives: a paused Run
+that banked elapsed time looks correct until it is released, then discharges a burst. Speed zero therefore
+advances nothing *and* accumulates nothing. `retimeAccumulator` trims a carried accumulator when Speed
+changes, so raising it does not discharge time banked against a slower interval.
+
+### `src/ui/panel.ts`
+
+The four live controls. Mutates the settings object; imports nothing from `sim/` or `render/`.
+
+Native `<input type="range">` restyled rather than hand-drawn sliders: pointer capture, touch, keyboard,
+and screen-reader semantics come free, and #11's touch requirement depends on that half already working.
+Each control is a `<label>` wrapping its own input, so no generated ids are needed and the panel is safe to
+build more than once.
+
+`SETTING_BOUNDS` in `settings.ts` is the single source for every control's range and step — the panel reads
+it, and clamping is applied on every write so a value off the step never reaches the ring arithmetic.
+
 ## Known risks
 
-- **The instance cap has no number.** Defaults are 48 × 48 × 60 — about 138,000 instances — chosen to look
-  right, not measured. Grid dimensions × depth determines the draw, and there is no server to absorb it. A
-  single conservative cap set by measurement on real low-end hardware is #12.
+- **The instance cap has no number, and the panel now permits twice the default.** Defaults are
+  48 × 48 × 60 — about 138,000 instances — chosen to look right, not measured. Since #9 the Depth Window
+  slider reaches 120, so a Viewer can ask for 276,480, and the ring is *allocated* at that ceiling
+  regardless of the current setting. Grid dimensions × depth determines the draw, and there is no server to
+  absorb it. `SETTING_BOUNDS` is deliberately the single place #12 writes the measured limit.
 - **Smoothness has never been observed on a real GPU.** Every render check so far ran against a software
   rasteriser, whose frame timings mean nothing. The design keeps per-frame CPU work constant, but that is
   reasoning, not evidence.
@@ -319,6 +381,12 @@ proportional to Stack size.
 - **Darkening terms compound.** Face shading, the edge rim, and the depth fade all reduce the same pixel.
   Each is defensible alone; together they once turned the middle of the structure to mud. Check the render
   before adding a fourth.
+- **A blank frame from a headless run may be the rasteriser, not the product.** During #9 a run that took
+  nine full-page screenshots produced rich frames and then blank ones for the rest of the session, which
+  read exactly like a rendering bug. It was SwiftShader's GPU process dying under repeated captures — the
+  same sequence with four captures reported an empty error log throughout. Check the console error list
+  before believing a blank frame.
+
 - **Screen-space effects need checking across the whole camera range.** The edge rim was correct at the
   fixed distance #6 and #8 could reach and wrong once #7 allowed zooming out. Anything using `fwidth` or
   otherwise scaling with apparent size should be looked at from near, default, and far — the smoke script
