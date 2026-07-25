@@ -1,27 +1,29 @@
 {
-  "name": "3dgol",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "description": "Conway's Game of Life with the time axis drawn — each generation stacked as a layer.",
-  "packageManager": "pnpm@10.33.0",
-  "engines": {
-    "node": ">=20.19.0"
-  },
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "format": "biome check --write",
-    "lint": "biome check",
-    "typecheck": "tsc --noEmit",
-    "deploy": "wrangler deploy"
-  },
-  "devDependencies": {
-    "@types/node": "^26.1.1",
-    "typescript": "^7.0.2",
-    "vite": "^8.1.5"
-  }
+	"name": "3dgol",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "Conway's Game of Life with the time axis drawn — each generation stacked as a layer.",
+	"packageManager": "pnpm@10.33.0",
+	"engines": {
+		"node": ">=20.19.0"
+	},
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"preview": "vite preview",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"format": "biome check --write",
+		"lint": "biome check",
+		"typecheck": "tsc --noEmit",
+		"deploy": "wrangler deploy"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.5.5",
+		"@types/node": "^26.1.1",
+		"typescript": "^7.0.2",
+		"vite": "^8.1.5",
+		"vitest": "^4.1.10"
+	}
 }
