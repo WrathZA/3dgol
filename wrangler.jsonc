@@ -3,6 +3,17 @@
 	"name": "3dgol",
 	"compatibility_date": "2026-07-25",
 
+	// Custom domains. Cloudflare creates the DNS records and provisions
+	// certificates itself, so nothing here needs a DNS entry adding by hand —
+	// but the zone must already exist in the same account, with the domain
+	// delegated to Cloudflare's nameservers. Deploying before that fails.
+	//
+	// The `3dgol.<subdomain>.workers.dev` address keeps working alongside these.
+	"routes": [
+		{ "pattern": "goltime.win", "custom_domain": true },
+		{ "pattern": "www.goltime.win", "custom_domain": true }
+	],
+
 	// Static assets only — this project has no server-side code and no Worker
 	// script. Cloudflare serves the built `dist/` directory directly.
 	"assets": {
