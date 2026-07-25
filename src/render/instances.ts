@@ -85,6 +85,22 @@ const GRADIENT_STOPS = [
 ] as const;
 
 /**
+ * How many stops the fragment shader is written to expect.
+ *
+ * GLSL uniform arrays need a compile-time size, so the count appears both here
+ * and literally in the shader. Adding a stop without updating the shader would
+ * otherwise fail silently — the extra colour simply never appearing. This makes
+ * the mismatch throw at construction instead.
+ */
+const GRADIENT_STOP_COUNT = 5;
+
+if (GRADIENT_STOPS.length !== GRADIENT_STOP_COUNT) {
+	throw new Error(
+		`Colour Gradient has ${GRADIENT_STOPS.length} stops; the shader declares ${GRADIENT_STOP_COUNT}`,
+	);
+}
+
+/**
  * Instance index where a slot's Cells begin.
  *
  * Pure and exported so the ring arithmetic — the one part of this module that
