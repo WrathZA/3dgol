@@ -143,11 +143,49 @@ function startRun(previous: Run | undefined): Run {
 	};
 }
 
-const run = startRun(undefined);
+let run = startRun(undefined);
+
+/**
+ * Whether the Viewer has asked for a Restart since the last frame.
+ *
+ * A flag the panel raises and the loop lowers, rather than a callback the panel
+ * calls. Two reasons. Every change to Run state then happens in one place, at a
+ * known point in the frame, instead of a Simulation being replaced part-way
+ * through a frame that already holds a reference to the old one. And a Restart
+ * requested while paused behaves exactly like any other, because the loop runs
+ * regardless of Speed.
+ */
+const restart = { requested: false };
 
 createControlPanel(settings);
 
 let lastFrameTime = performance.now();
+
+/**
+ * Begins a new Run, reusing the current one's buffers where it can.
+ *
+ * Two paths, because they cost very differently. Unchanged Grid dimensions reseed
+ * in place: the Simulation's own Restart clears the Stack, resets the Generation
+ * counter, and draws a fresh random Seed, all inside buffers that are already the
+ * right size. Changed dimensions cannot do that — a Grid size is fixed for the
+ * life of a Simulation — so the Run is rebuilt.
+ *
+ * Both give a genuinely different Run, because the Seed is drawn afresh either
+ * way. The Viewer chooses *when* a Seed is generated, never what it holds.
+ */
+function restartRun(): void {
+	const dimensionsChanged =
+		settings.gridWidth !== run.width || settings.gridHeight !== run.height;
+
+	if (dimensionsChanged) {
+		run = startRun(run);
+		return;
+	}
+
+	run.simulation.restart();
+	run.view.reset();
+	run.accumulated = 0;
+}
 
 /**
  * Brings the Depth Window toward what the Viewer asked for.
@@ -192,6 +230,14 @@ function frame(now: number): void {
 
 	const elapsed = (now - lastFrameTime) / 1000;
 	lastFrameTime = now;
+
+	// Taken before anything else this frame, so a Restart requested while the
+	// previous frame was in flight lands on a Run that is not part-way through
+	// having settings applied to it.
+	if (restart.requested) {
+		restart.requested = false;
+		restartRun();
+	}
 
 	if (settings.generationsPerSecond !== run.appliedSpeed) {
 		// Time banked against a slower Speed can be worth several Generations at a
