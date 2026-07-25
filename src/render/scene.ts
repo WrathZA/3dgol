@@ -61,6 +61,15 @@ export interface SceneHandle {
 	 * Fractional values are expected — this follows the Depth Window as it eases.
 	 */
 	setDepthWindow(depthWindow: number): void;
+	/**
+	 * Re-aims at a structure of a new footprint as well as a new height.
+	 *
+	 * Grid dimensions change on Restart, and the retreat limit is derived from the
+	 * larger of footprint and height. Without this, a Run restarted at a bigger
+	 * Grid keeps the limit sized for the old one and simply cannot be backed away
+	 * from far enough to see whole.
+	 */
+	setExtent(extent: StructureExtent): void;
 	dispose(): void;
 }
 
@@ -129,17 +138,29 @@ export function createScene(
 	 * at the mid-height of a full Stack, so while the Stack fills the structure
 	 * sits low in frame and rises into place. Following the growth itself would
 	 * drift the frame under the Viewer between Generations.
+	 *
+	 * Held in a mutable local rather than read from the construction argument,
+	 * because Grid dimensions change on Restart and the retreat limit depends on
+	 * the footprint as well as the height.
 	 */
-	const setDepthWindow = (depthWindow: number): void => {
-		const stackHeight = depthWindow * LAYER_SPACING;
-		const footprint = Math.max(extent.width, extent.height) * CELL_SPACING;
+	let framed: StructureExtent = extent;
+
+	const setExtent = (next: StructureExtent): void => {
+		framed = next;
+
+		const stackHeight = framed.depthWindow * LAYER_SPACING;
+		const footprint = Math.max(framed.width, framed.height) * CELL_SPACING;
 		const reach = Math.max(footprint, stackHeight);
 
 		controls.target.set(0, stackHeight * 0.5, 0);
 		controls.maxDistance = reach * FURTHEST_RETREAT_IN_REACHES;
 	};
 
-	setDepthWindow(extent.depthWindow);
+	const setDepthWindow = (depthWindow: number): void => {
+		setExtent({ ...framed, depthWindow });
+	};
+
+	setExtent(extent);
 
 	const resize = (): void => {
 		const width = canvas.clientWidth;
@@ -162,6 +183,7 @@ export function createScene(
 		controls,
 		resize,
 		setDepthWindow,
+		setExtent,
 		dispose: () => {
 			controls.dispose();
 			renderer.dispose();
