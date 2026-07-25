@@ -14,9 +14,14 @@ import { BACKGROUND_COLOR, CELL_SPACING, LAYER_SPACING } from "@/render/scene";
  * The whole Stack as a single instanced draw.
  *
  * One instance exists for every Cell position in every ring slot —
- * `width × height × depthWindow` of them — and the entire structure is one draw
+ * `width × height × ringCapacity` of them — and the entire structure is one draw
  * call regardless of how many Cells are alive. Draw calls, not triangles, are
  * the ceiling in practice.
+ *
+ * The ring is allocated at the largest Depth Window the interface permits, and
+ * the draw range covers only the slots the current window uses. The Depth Window
+ * is a Viewer control, so allocating exactly what it asks for would mean
+ * reallocating the whole buffer on a slider drag.
  *
  * Fixed slots are what make the ring indexing work, so dead Cells are not
  * skipped: they occupy an instance and the vertex shader collapses them to zero
@@ -31,7 +36,16 @@ export interface StructureMeshOptions {
 	/** Age at which a Cell dies — the far end of the Colour Gradient. */
 	maximumAge: number;
 	/** Edge length of a drawn Cell, as a fraction of `CELL_SPACING`. */
-	cellScale?: number;
+	cellSize?: number;
+	/**
+	 * Ring slots to allocate, which must be at least `depthWindow`.
+	 *
+	 * The Depth Window is a Viewer control, so allocating exactly what it
+	 * currently asks for would mean reallocating the whole instance buffer every
+	 * time the slider moved. Allocating once at the largest window the interface
+	 * permits means changing it costs a uniform and a draw range instead.
+	 */
+	ringCapacity?: number;
 }
 
 export interface StructureMesh {
@@ -47,6 +61,31 @@ export interface StructureMesh {
 	setFrameState(currentGeneration: number, layerCount: number): void;
 	/** Retargets the Colour Gradient when Maximum Age changes. */
 	setMaximumAge(maximumAge: number): void;
+	/** Resizes drawn Cells, between a porous scatter and solid sheets. */
+	setCellSize(cellSize: number): void;
+	/**
+	 * Sets the window the shader fades and cuts off against.
+	 *
+	 * A fractional value is accepted and intended. Both the fade and the cut-off
+	 * derive from this, and they meet exactly — a Layer is fully dissolved at the
+	 * moment it is cut. Easing this rather than snapping it therefore makes a
+	 * narrowing window dissolve its oldest Layers instead of deleting them.
+	 *
+	 * This changes what is *seen*, not what is drawn. See `setSlotCount`.
+	 */
+	setDepthWindow(depthWindow: number): void;
+	/**
+	 * Sets how many ring slots are drawn, and so how much is drawn at all.
+	 *
+	 * Separate from `setDepthWindow` because the two answer different questions.
+	 * This one must cover every slot the ring assigns, or a Layer written to a
+	 * high slot would simply not be drawn however new it is. It is what makes a
+	 * lower Depth Window genuinely cheaper — the slider has to be a way out for
+	 * a device that cannot afford the full Stack, not only a way to change how
+	 * the structure looks — so it changes when the ring is re-laid out, not
+	 * while the window is easing toward it.
+	 */
+	setSlotCount(slots: number): void;
 	/** Marks every instance unwritten, discarding the previous Run's Layers. */
 	resetLayers(): void;
 	dispose(): void;
@@ -60,8 +99,13 @@ export interface StructureMesh {
  * near 1, Cells touch and the Stack fuses into a solid mass — history becomes
  * invisible, which is the one thing this product exists to show. Around half,
  * each Generation reads as its own stratum and you can see into the structure.
+ *
+ * Now a Viewer control, so the Cell is built as a unit cube and this scales it
+ * in the vertex shader. Rebuilding the geometry on each change would allocate
+ * on a slider drag, and the whole design exists to avoid allocating while the
+ * product is animating.
  */
-const DEFAULT_CELL_SCALE = 0.55;
+const DEFAULT_CELL_SIZE = 0.55;
 
 /**
  * The Colour Gradient, birth on the left, death on the right.
@@ -137,22 +181,31 @@ export function createStructureMesh(
 	options: StructureMeshOptions,
 ): StructureMesh {
 	const { width, height, depthWindow } = options;
-	const cellScale = options.cellScale ?? DEFAULT_CELL_SCALE;
+	const ringCapacity = options.ringCapacity ?? depthWindow;
+	if (ringCapacity < depthWindow) {
+		throw new Error(
+			`Ring capacity ${ringCapacity} cannot hold a Depth Window of ${depthWindow}`,
+		);
+	}
+
 	const cellsPerLayer = width * height;
-	const instanceCount = cellsPerLayer * depthWindow;
+	const instanceCount = cellsPerLayer * ringCapacity;
 
 	const geometry = new InstancedBufferGeometry();
-	// A cube: equal on every axis, because the lattice is isotropic.
-	const edge = cellScale * CELL_SPACING;
-	const box = new BoxGeometry(edge, edge, edge);
+	// A unit cube: equal on every axis, because the lattice is isotropic. Cell
+	// Size scales it in the vertex shader rather than here, so changing it does
+	// not rebuild geometry.
+	const box = new BoxGeometry(CELL_SPACING, CELL_SPACING, CELL_SPACING);
 	geometry.index = box.index;
 	geometry.attributes = box.attributes;
-	geometry.instanceCount = instanceCount;
+	// Only the slots inside the Depth Window are drawn. The rest stay allocated
+	// and idle, ready for the window to widen again.
+	geometry.instanceCount = cellsPerLayer * depthWindow;
 
 	// Grid position never changes: instance i of slot s is always the same Cell.
 	// Written once at construction and never touched again.
 	const gridPositions = new Float32Array(instanceCount * 2);
-	for (let slot = 0; slot < depthWindow; slot++) {
+	for (let slot = 0; slot < ringCapacity; slot++) {
 		for (let index = 0; index < cellsPerLayer; index++) {
 			const column = index % width;
 			const row = Math.floor(index / width);
@@ -183,13 +236,16 @@ export function createStructureMesh(
 	const currentGenerationUniform = { value: 0 };
 	const layerCountUniform = { value: 0 };
 	const maximumAgeUniform = { value: options.maximumAge };
+	const cellSizeUniform = { value: options.cellSize ?? DEFAULT_CELL_SIZE };
+	const depthWindowUniform = { value: depthWindow };
 
 	const material = new ShaderMaterial({
 		uniforms: {
 			uCurrentGeneration: currentGenerationUniform,
 			uLayerCount: layerCountUniform,
 			uMaximumAge: maximumAgeUniform,
-			uDepthWindow: { value: depthWindow },
+			uCellSize: cellSizeUniform,
+			uDepthWindow: depthWindowUniform,
 			uLayerSpacing: { value: LAYER_SPACING },
 			uGradient: { value: GRADIENT_STOPS.map((hex) => new Color(hex)) },
 			uBackground: { value: new Color(BACKGROUND_COLOR) },
@@ -207,7 +263,7 @@ export function createStructureMesh(
 		mesh,
 
 		writeLayer(slot, layerAges, birthGeneration) {
-			const { start, count } = slotRange(slot, width, height, depthWindow);
+			const { start, count } = slotRange(slot, width, height, ringCapacity);
 			if (layerAges.length !== count) {
 				throw new Error(
 					`Layer holds ${layerAges.length} Cells, expected ${count}`,
@@ -235,6 +291,23 @@ export function createStructureMesh(
 
 		setMaximumAge(maximumAge) {
 			maximumAgeUniform.value = maximumAge;
+		},
+
+		setCellSize(cellSize) {
+			cellSizeUniform.value = cellSize;
+		},
+
+		setDepthWindow(nextDepthWindow) {
+			depthWindowUniform.value = nextDepthWindow;
+		},
+
+		setSlotCount(slots) {
+			if (!Number.isInteger(slots) || slots < 1 || slots > ringCapacity) {
+				throw new Error(
+					`Slot count must be a whole number of the ${ringCapacity} allocated, got ${slots}`,
+				);
+			}
+			geometry.instanceCount = cellsPerLayer * slots;
 		},
 
 		/**
@@ -284,6 +357,7 @@ attribute float aAge;
 uniform float uCurrentGeneration;
 uniform float uLayerCount;
 uniform float uMaximumAge;
+uniform float uCellSize;
 uniform float uDepthWindow;
 uniform float uLayerSpacing;
 
@@ -327,7 +401,10 @@ void main() {
 	// by the time a slot is recycled its Cells have already shrunk away.
 	float shrink = 1.0 - smoothstep(FADE_START, 1.0, sunk);
 
-	vec3 placed = position * (visible ? shrink : 0.0)
+	// The Cell is a unit cube here and Cell Size scales it, so the Viewer moves
+	// between a porous scatter and touching sheets without any geometry being
+	// rebuilt. Dead Cells and retired Layers collapse to nothing the same way.
+	vec3 placed = position * uCellSize * (visible ? shrink : 0.0)
 		+ vec3(aGridPosition.x, y, aGridPosition.y);
 
 	vNormal = normal;
