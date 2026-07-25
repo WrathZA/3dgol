@@ -4,8 +4,13 @@ Live map of project layout, components, and patterns. Seeded at bootstrap; updat
 
 ## Current state
 
-**Toolchain and deployment path exist; no product code yet.** Issue #3 scaffolded the project and proved
-the deployment path end to end. What is built:
+**Toolchain, deployment path, and the simulation core exist. Nothing is rendered yet.**
+
+Issue #3 scaffolded the project and proved the deployment path. Issue #4 built the simulation — the part
+that produces generations. Nothing imports `src/sim/` yet, so the deployed bundle is unchanged and the
+modules are tree-shaken out of the build; rendering (#6) wires them up.
+
+What is built:
 
 | Area | State |
 |------|-------|
@@ -30,8 +35,17 @@ index.html            Placeholder page — title, description, #app mount point
 src/
   main.ts             Mounts the placeholder message; throws if #app is absent
   placeholder.ts      Returns the placeholder string; stands in until rendering lands
+  sim/                Pure simulation — imports nothing outside itself
+    grid.ts           Grid storage, index arithmetic, Bounded Edge, neighbour counting
+    rules.ts          B3/S23 + age increment + Death by Old Age
+    simulation.ts     Run state — generation counter, Maximum Age, advance(), restart()
 tests/
   placeholder.test.ts Toolchain smoke test — runner, @/ alias, module import
+  sim/
+    helpers.ts        Pattern-to-Grid fixtures and comparison helpers (not a test file)
+    grid.test.ts      Dimensions, Bounded Edge, neighbour counting
+    rules.test.ts     Golden Life patterns, Age semantics, Death by Old Age
+    simulation.test.ts Run lifecycle, Seed density, determinism, Maximum Age changes
 biome.json            Scoped to src/, tests/, and config files only
 vite.config.ts        @/ alias + Vitest config (tests live in tests/**/*.test.ts)
 tsconfig.json         strict, noUncheckedIndexedAccess, @/ paths
@@ -122,10 +136,54 @@ undoes it.
 
 ## Components
 
-No product components yet. `src/placeholder.ts` exists only so the deployment path could be proven and the
-smoke test has something to import; it is expected to be deleted once rendering lands.
+### `src/sim/grid.ts`
 
-As modules land, record here what each owns and what it exposes.
+Owns Grid storage and the Bounded Edge.
+
+A Grid is `{ width, height, ages: Uint16Array }`. **Age is the state**: `ages[i]` is 0 when a Cell is dead
+and its Age when alive. There is no separate alive flag, because storing one would permit states that
+cannot occur — alive with no Age, dead carrying an Age.
+
+`ageAt()` returns 0 outside the Grid, and that single behaviour *is* the Bounded Edge: it makes
+out-of-bounds positions permanently dead, so a pattern reaching the boundary is destroyed rather than
+reappearing on the far side. `liveNeighbourCount()` counts eight positions — never twenty-six; neighbours
+are counted within one Generation because the third axis of this product is time, not space.
+
+Exposes: `Grid`, `MAX_REPRESENTABLE_AGE`, `createGrid`, `indexOf`, `contains`, `ageAt`, `isAlive`,
+`setAgeAt`, `liveNeighbourCount`, `population`, `clearGrid`.
+
+### `src/sim/rules.ts`
+
+Owns the rule: B3/S23 plus Death by Old Age.
+
+`nextGeneration(current, next, maximumAge)` reads exclusively from `current` and writes exclusively to
+`next`. That separation is what makes every Cell see the same snapshot — computing in place would let
+Cells resolved earlier in the pass influence Cells resolved later, which is not Life and produces
+plausible-looking wrong output.
+
+`nextAge(age, liveNeighbours, maximumAge)` is exported deliberately so the age cap can be asserted
+directly rather than inferred from Grid output. **Death by Old Age is checked before neighbour count**,
+because it applies regardless of neighbours.
+
+### `src/sim/simulation.ts`
+
+Owns Run state: the current Grid, the generation counter, and Maximum Age.
+
+Holds two Grids allocated once at construction and swaps them on `advance()` — no allocation per
+Generation, because GC pauses read as stutter in a continuously animating product. `restart()` ends the
+Run and reseeds randomly from a `RandomSource`, which defaults to `Math.random` and is injectable so tests
+get reproducible Runs.
+
+Setting `maximumAge` does **not** reach into the Grid to kill over-age Cells; they die on the next
+`advance()`, where the rule lives. Duplicating the rule in the setter would create two copies that
+eventually disagree.
+
+Exposes: `Simulation`, `SimulationOptions`, `RandomSource`, `DEFAULT_SEED_DENSITY`.
+
+### `src/placeholder.ts`
+
+Exists only so the deployment path could be proven and the smoke test has something to import. Expected to
+be deleted once rendering lands.
 
 ## Known risks
 
