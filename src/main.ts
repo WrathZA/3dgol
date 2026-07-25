@@ -1,5 +1,5 @@
 import { createScene } from "@/render/scene";
-import { createStructureView } from "@/render/structure";
+import { createStructureView, type StructureView } from "@/render/structure";
 import { clampSettings, DEFAULT_SETTINGS, SETTING_BOUNDS } from "@/settings";
 import { advanceClock, retimeAccumulator } from "@/sim/clock";
 import { Simulation } from "@/sim/simulation";
@@ -28,27 +28,14 @@ if (canvas === null) {
 
 const settings = clampSettings(DEFAULT_SETTINGS);
 
-const simulation = new Simulation({
-	width: settings.gridWidth,
-	height: settings.gridHeight,
-	depthWindow: settings.depthWindow,
-	maximumAge: settings.maximumAge,
-});
-
-const view = createStructureView(simulation, {
-	cellSize: settings.cellSize,
-	// Allocated once at the largest Depth Window the panel permits, so moving that
-	// slider re-lays the ring rather than reallocating it.
-	ringCapacity: SETTING_BOUNDS.depthWindow.max,
-});
+// The stage outlives any single Run: the renderer, camera, and controls are the
+// Viewer's vantage point, and Restarting the simulation should not throw away
+// where they were standing.
 const stage = createScene(canvas, {
 	width: settings.gridWidth,
 	height: settings.gridHeight,
 	depthWindow: settings.depthWindow,
 });
-
-stage.scene.add(view.mesh);
-createControlPanel(settings);
 
 window.addEventListener("resize", stage.resize);
 
@@ -68,22 +55,98 @@ window.addEventListener("resize", stage.resize);
 const DEPTH_WINDOW_LAYERS_PER_SECOND = 90;
 
 /**
- * What has been applied, against which the settings object is compared.
+ * A Run in progress, and everything that has to be reset when one begins.
  *
- * Comparing four numbers per frame is constant work regardless of how many
- * instances exist, which is the property the whole rendering design protects.
- * The alternative — the panel notifying whoever needs to know — would put the
- * interface in the business of knowing what a setting affects.
+ * Grouped into one object deliberately. Held as separate variables, starting a
+ * Run means remembering to reset each of them, and the failure from forgetting
+ * one is both severe and hard to trace: stale travel state re-lays a ring that
+ * no longer exists, and a stale accumulator discharges the previous Run's banked
+ * time into the new one. Replacing the whole object cannot half-happen.
  */
-let appliedSpeed = settings.generationsPerSecond;
-let appliedMaximumAge = settings.maximumAge;
-let appliedCellSize = settings.cellSize;
-/** The Depth Window being drawn, which travels toward the setting. */
-let drawnDepthWindow = settings.depthWindow;
-/** The Depth Window the ring is laid out for, an integer by construction. */
-let laidOutDepthWindow = settings.depthWindow;
+interface Run {
+	readonly simulation: Simulation;
+	readonly view: StructureView;
+	/**
+	 * The Grid dimensions this Run was started at.
+	 *
+	 * Recorded rather than read back from the settings, because the settings hold
+	 * what the Viewer has *asked for* while these hold what is actually running.
+	 * The difference between the two is what makes a staged Grid change visible
+	 * instead of appearing to have done nothing.
+	 */
+	readonly width: number;
+	readonly height: number;
+	/** Live settings already pushed, against which the settings are compared. */
+	appliedSpeed: number;
+	appliedMaximumAge: number;
+	appliedCellSize: number;
+	/** The Depth Window being drawn, which travels toward the setting. */
+	drawnDepthWindow: number;
+	/** The Depth Window the ring is laid out for. An integer by construction. */
+	laidOutDepthWindow: number;
+	/** Time banked toward the next Generation. */
+	accumulated: number;
+}
 
-let accumulated = 0;
+/**
+ * Begins a Run at the currently staged Grid dimensions.
+ *
+ * The only path that starts a Run — used at boot and again whenever the Viewer
+ * changes dimensions — so there is no second path to drift out of step with this
+ * one.
+ *
+ * It allocates, unlike almost everything else here: a Grid size is fixed for the
+ * life of a Simulation, the Stack is sized from it, and every instance's Grid
+ * position is written once at construction, so a new size means new buffers.
+ * That is acceptable here and nowhere else, because it happens on a Viewer
+ * action rather than per Generation or per frame.
+ */
+function startRun(previous: Run | undefined): Run {
+	if (previous !== undefined) {
+		stage.scene.remove(previous.view.mesh);
+		previous.view.dispose();
+	}
+
+	const width = settings.gridWidth;
+	const height = settings.gridHeight;
+
+	const simulation = new Simulation({
+		width,
+		height,
+		depthWindow: settings.depthWindow,
+		maximumAge: settings.maximumAge,
+	});
+
+	const view = createStructureView(simulation, {
+		cellSize: settings.cellSize,
+		// Allocated at the largest Depth Window the panel permits, so moving that
+		// slider re-lays the ring rather than reallocating it.
+		ringCapacity: SETTING_BOUNDS.depthWindow.max,
+	});
+
+	stage.scene.add(view.mesh);
+	// The footprint changes with the Grid, and the retreat limit derives from it —
+	// without this a larger Grid cannot be backed away from far enough to see.
+	stage.setExtent({ width, height, depthWindow: settings.depthWindow });
+
+	return {
+		simulation,
+		view,
+		width,
+		height,
+		appliedSpeed: settings.generationsPerSecond,
+		appliedMaximumAge: settings.maximumAge,
+		appliedCellSize: settings.cellSize,
+		drawnDepthWindow: settings.depthWindow,
+		laidOutDepthWindow: settings.depthWindow,
+		accumulated: 0,
+	};
+}
+
+const run = startRun(undefined);
+
+createControlPanel(settings);
+
 let lastFrameTime = performance.now();
 
 /**
@@ -97,30 +160,30 @@ let lastFrameTime = performance.now();
 function applyDepthWindow(elapsed: number): void {
 	const target = settings.depthWindow;
 
-	if (target > laidOutDepthWindow) {
-		simulation.stack.maxDepth = target;
-		laidOutDepthWindow = target;
-		view.relayRing();
+	if (target > run.laidOutDepthWindow) {
+		run.simulation.stack.maxDepth = target;
+		run.laidOutDepthWindow = target;
+		run.view.relayRing();
 	}
 
-	if (drawnDepthWindow !== target) {
+	if (run.drawnDepthWindow !== target) {
 		const travel = DEPTH_WINDOW_LAYERS_PER_SECOND * elapsed;
-		drawnDepthWindow =
-			target > drawnDepthWindow
-				? Math.min(drawnDepthWindow + travel, target)
-				: Math.max(drawnDepthWindow - travel, target);
+		run.drawnDepthWindow =
+			target > run.drawnDepthWindow
+				? Math.min(run.drawnDepthWindow + travel, target)
+				: Math.max(run.drawnDepthWindow - travel, target);
 
-		view.setDepthWindow(drawnDepthWindow);
-		stage.setDepthWindow(drawnDepthWindow);
+		run.view.setDepthWindow(run.drawnDepthWindow);
+		stage.setDepthWindow(run.drawnDepthWindow);
 	}
 
 	// Arrived, and narrower than the ring is laid out for: the Layers beyond the
 	// new window have finished dissolving, so the Stack can let them go and the
 	// ring can shrink to what is now drawn.
-	if (drawnDepthWindow === target && target < laidOutDepthWindow) {
-		simulation.stack.maxDepth = target;
-		laidOutDepthWindow = target;
-		view.relayRing();
+	if (run.drawnDepthWindow === target && target < run.laidOutDepthWindow) {
+		run.simulation.stack.maxDepth = target;
+		run.laidOutDepthWindow = target;
+		run.view.relayRing();
 	}
 }
 
@@ -130,37 +193,40 @@ function frame(now: number): void {
 	const elapsed = (now - lastFrameTime) / 1000;
 	lastFrameTime = now;
 
-	if (settings.generationsPerSecond !== appliedSpeed) {
+	if (settings.generationsPerSecond !== run.appliedSpeed) {
 		// Time banked against a slower Speed can be worth several Generations at a
 		// faster one, which would discharge as a burst the moment the slider moved.
-		accumulated = retimeAccumulator(accumulated, settings.generationsPerSecond);
-		appliedSpeed = settings.generationsPerSecond;
+		run.accumulated = retimeAccumulator(
+			run.accumulated,
+			settings.generationsPerSecond,
+		);
+		run.appliedSpeed = settings.generationsPerSecond;
 	}
 
-	if (settings.maximumAge !== appliedMaximumAge) {
+	if (settings.maximumAge !== run.appliedMaximumAge) {
 		// The Simulation holds Maximum Age and the rule applies it, so Cells already
 		// past a lowered value die on the next Generation. Reaching into the Grid to
 		// kill them here would be a second copy of the rule.
-		simulation.maximumAge = settings.maximumAge;
-		appliedMaximumAge = settings.maximumAge;
+		run.simulation.maximumAge = settings.maximumAge;
+		run.appliedMaximumAge = settings.maximumAge;
 	}
 
-	if (settings.cellSize !== appliedCellSize) {
-		view.setCellSize(settings.cellSize);
-		appliedCellSize = settings.cellSize;
+	if (settings.cellSize !== run.appliedCellSize) {
+		run.view.setCellSize(settings.cellSize);
+		run.appliedCellSize = settings.cellSize;
 	}
 
 	applyDepthWindow(elapsed);
 
 	const step = advanceClock(
-		accumulated,
+		run.accumulated,
 		elapsed,
 		settings.generationsPerSecond,
 	);
-	accumulated = step.accumulated;
+	run.accumulated = step.accumulated;
 	for (let generation = 0; generation < step.generations; generation++) {
-		simulation.advance();
-		view.syncLatestLayer();
+		run.simulation.advance();
+		run.view.syncLatestLayer();
 	}
 
 	// Camera movement is entirely separate from the Run. Generations advance on
@@ -169,7 +235,7 @@ function frame(now: number): void {
 	// for a moment after a gesture ends.
 	stage.controls.update();
 
-	view.syncFrameState();
+	run.view.syncFrameState();
 	stage.renderer.render(stage.scene, stage.camera);
 }
 
