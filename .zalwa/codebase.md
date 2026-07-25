@@ -4,10 +4,42 @@ Live map of project layout, components, and patterns. Seeded at bootstrap; updat
 
 ## Current state
 
-**No source files exist yet.** The repository contains the `.zalwa/` workflow documents, `CLAUDE.md`, and
-`README.md`. Everything below is the planned layout derived from `.zalwa/stack.md`, not an observed one.
-The first implementation issue should scaffold the Vite project and replace this section with the actual
-state.
+**Toolchain and deployment path exist; no product code yet.** Issue #3 scaffolded the project and proved
+the deployment path end to end. What is built:
+
+| Area | State |
+|------|-------|
+| Language | TypeScript 7.0.2 — `strict` + `noUncheckedIndexedAccess`, `@/` → `src/` alias |
+| Build | Vite 8.1.5 |
+| Package manager | pnpm 10.33.0, pinned via `packageManager`; Node pinned in `.nvmrc` |
+| Lint / format | Biome 2.5.5, pinned exact, scoped to `src/`, `tests/`, and config files |
+| Tests | Vitest 4.1.10 — one toolchain smoke test |
+| Deploy | Cloudflare Workers static assets via Wrangler |
+| Live URL | https://3dgol.miller-brettm.workers.dev |
+
+**Not automated:** CI does not run, and merging does not deploy. Deployment is `pnpm exec wrangler deploy`
+run locally. Automating it additionally requires a Cloudflare API token as a repository secret. Tracked
+separately — deferred by operator decision during #3.
+
+Everything under "Planned layout" below that is not listed above is still unbuilt.
+
+## Actual files
+
+```
+index.html            Placeholder page — title, description, #app mount point
+src/
+  main.ts             Mounts the placeholder message; throws if #app is absent
+  placeholder.ts      Returns the placeholder string; stands in until rendering lands
+tests/
+  placeholder.test.ts Toolchain smoke test — runner, @/ alias, module import
+biome.json            Scoped to src/, tests/, and config files only
+vite.config.ts        @/ alias + Vitest config (tests live in tests/**/*.test.ts)
+tsconfig.json         strict, noUncheckedIndexedAccess, @/ paths
+wrangler.jsonc        Static assets from ./dist, not_found_handling: 404-page
+package.json          Scripts mirror .zalwa/stack.md Development Commands
+.nvmrc                Node version pin
+.gitignore            node_modules, dist, .wrangler, *.local, .DS_Store
+```
 
 ## Planned layout
 
@@ -90,7 +122,10 @@ undoes it.
 
 ## Components
 
-Nothing implemented yet. As modules land, record here what each owns and what it exposes.
+No product components yet. `src/placeholder.ts` exists only so the deployment path could be proven and the
+smoke test has something to import; it is expected to be deleted once rendering lands.
+
+As modules land, record here what each owns and what it exposes.
 
 ## Known risks
 
