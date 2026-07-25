@@ -14,11 +14,12 @@ export const CELL_SPACING = 1;
 /**
  * World units between adjacent Layers.
  *
- * Deliberately less than `CELL_SPACING`. At equal spacing a deep Stack becomes a
- * tower far taller than it is wide, which frames badly and buries the footprint
- * the shapes are drawn on.
+ * Less than `CELL_SPACING`, so a deep Stack does not become a tower far taller
+ * than it is wide — but not so much less that Layers collapse into each other.
+ * A drawn Cell occupies well under this distance (see `LAYER_THICKNESS_RATIO`),
+ * which is what keeps the strata separately visible.
  */
-export const LAYER_SPACING = 0.5;
+export const LAYER_SPACING = 0.7;
 
 export interface StructureExtent {
 	width: number;

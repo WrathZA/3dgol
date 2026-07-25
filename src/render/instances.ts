@@ -47,8 +47,24 @@ export interface StructureMesh {
 	dispose(): void;
 }
 
-/** Default fraction of a Cell's spacing that the drawn box occupies. */
-const DEFAULT_CELL_SCALE = 0.8;
+/**
+ * Default fraction of a Cell's spacing that the drawn box occupies.
+ *
+ * Well under 1 on purpose. At near-touching sizes a busy Generation becomes an
+ * unbroken sheet, and the whole point is that dead positions draw nothing — a
+ * structure you cannot see into has no shape.
+ */
+const DEFAULT_CELL_SCALE = 0.6;
+
+/**
+ * Height of a drawn Cell as a fraction of the distance between Layers.
+ *
+ * The single most important number for whether the product works. Near 1, Layers
+ * touch and the Stack fuses into one solid mass — history becomes invisible,
+ * which is the one thing this product exists to show. Well under half, each
+ * Generation reads as its own stratum with clear space above and below it.
+ */
+const LAYER_THICKNESS_RATIO = 0.4;
 
 /**
  * Instance index where a slot's Cells begin.
@@ -93,9 +109,9 @@ export function createStructureMesh(
 
 	const geometry = new InstancedBufferGeometry();
 	const box = new BoxGeometry(
-		cellScale,
-		cellScale * (LAYER_SPACING / CELL_SPACING),
-		cellScale,
+		cellScale * CELL_SPACING,
+		LAYER_SPACING * LAYER_THICKNESS_RATIO,
+		cellScale * CELL_SPACING,
 	);
 	geometry.index = box.index;
 	geometry.attributes = box.attributes;
