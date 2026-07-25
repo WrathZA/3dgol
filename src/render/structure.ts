@@ -2,6 +2,7 @@ import type { Mesh } from "three";
 
 import {
 	createStructureMesh,
+	drawnLayerCount,
 	type StructureMesh,
 	slotForGeneration,
 } from "@/render/instances";
@@ -23,32 +24,78 @@ export interface StructureView {
 	syncLatestLayer(): void;
 	/** Call once per frame, before rendering. */
 	syncFrameState(): void;
+	/** Resizes drawn Cells. Camera and Layer positions are untouched. */
+	setCellSize(cellSize: number): void;
+	/**
+	 * Sets the window the shader fades and cuts off against.
+	 *
+	 * Fractional values are expected — easing this is what makes a narrowing
+	 * window dissolve its oldest Layers rather than deleting them.
+	 */
+	setDepthWindow(depthWindow: number): void;
+	/**
+	 * Re-lays the ring after the Stack's own Depth Window has changed.
+	 *
+	 * A Generation's slot is `generation % maxDepth`, so a changed Depth Window
+	 * moves every held Layer to a different slot. Every held Layer is therefore
+	 * rewritten — the one operation here proportional to the size of the Stack.
+	 * That is acceptable precisely because it happens on a Viewer action and
+	 * nowhere else: not per frame, not per Generation. It allocates nothing.
+	 *
+	 * Call after setting `simulation.stack.maxDepth`, never before.
+	 */
+	relayRing(): void;
 	/** Call after a Restart, before the next sync. */
 	reset(): void;
 	dispose(): void;
 }
 
-export function createStructureView(simulation: Simulation): StructureView {
-	const depthWindow = simulation.stack.maxDepth;
+export interface StructureViewOptions {
+	/** Edge length of a drawn Cell, as a fraction of the lattice spacing. */
+	cellSize?: number;
+	/**
+	 * Ring slots to allocate — the largest Depth Window the interface permits.
+	 *
+	 * Allocated once at this size so the Viewer can move the Depth Window without
+	 * the instance buffer being rebuilt underneath them.
+	 */
+	ringCapacity?: number;
+}
+
+export function createStructureView(
+	simulation: Simulation,
+	options: StructureViewOptions = {},
+): StructureView {
 	const structure: StructureMesh = createStructureMesh({
 		width: simulation.width,
 		height: simulation.height,
-		depthWindow,
+		depthWindow: simulation.stack.maxDepth,
 		maximumAge: simulation.maximumAge,
+		...(options.cellSize === undefined ? {} : { cellSize: options.cellSize }),
+		...(options.ringCapacity === undefined
+			? {}
+			: { ringCapacity: options.ringCapacity }),
 	});
 
-	const writeNewest = (): void => {
-		const stack = simulation.stack;
-		if (stack.depth === 0) {
-			return;
-		}
+	/** Ring modulus in force — the Stack's Depth Window as last laid out. */
+	let slotCount = simulation.stack.maxDepth;
+	/** The window being drawn, which the Viewer's changes travel toward. */
+	let drawnDepthWindow = simulation.stack.maxDepth;
 
-		const generation = stack.newestGeneration;
+	const writeLayerAtDepth = (depth: number): void => {
+		const generation = simulation.stack.generationAt(depth);
 		structure.writeLayer(
-			slotForGeneration(generation, depthWindow),
-			stack.layerAt(0),
+			slotForGeneration(generation, slotCount),
+			simulation.stack.layerAt(depth),
 			generation,
 		);
+	};
+
+	const writeNewest = (): void => {
+		if (simulation.stack.depth === 0) {
+			return;
+		}
+		writeLayerAtDepth(0);
 	};
 
 	// The Seed is already on the Stack by the time a Simulation is constructed,
@@ -61,11 +108,40 @@ export function createStructureView(simulation: Simulation): StructureView {
 		syncLatestLayer: writeNewest,
 
 		syncFrameState() {
-			structure.setFrameState(simulation.generation, simulation.stack.depth);
-			// Maximum Age becomes a Viewer control later; reading it each frame
-			// means the gradient retargets the moment it changes, with no
-			// separate notification to wire up.
+			structure.setFrameState(
+				simulation.generation,
+				drawnLayerCount(simulation.stack.depth, drawnDepthWindow),
+			);
+			// Maximum Age is read every frame rather than pushed on change: the
+			// gradient then retargets the moment the Viewer moves the slider, with
+			// no separate notification to keep in step.
 			structure.setMaximumAge(simulation.maximumAge);
+		},
+
+		setCellSize(cellSize) {
+			structure.setCellSize(cellSize);
+		},
+
+		setDepthWindow(depthWindow) {
+			drawnDepthWindow = depthWindow;
+			structure.setDepthWindow(depthWindow);
+		},
+
+		relayRing() {
+			slotCount = simulation.stack.maxDepth;
+			// Cleared first, and in full. Slots outside the new window still hold
+			// the previous layout, and a later widening would otherwise draw them
+			// as Layers of a Run that has moved on.
+			structure.resetLayers();
+			structure.setSlotCount(slotCount);
+
+			for (let depth = simulation.stack.depth - 1; depth >= 0; depth--) {
+				writeLayerAtDepth(depth);
+			}
+
+			// Each write narrows the upload to its own slot, so without this only
+			// the last Layer written would reach the GPU.
+			structure.uploadAll();
 		},
 
 		reset() {

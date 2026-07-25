@@ -1,0 +1,166 @@
+/*
+ * The control surface.
+ *
+ * The product's value is what it looks like, so a panel that reads as a debug
+ * widget undercuts the thing it is attached to. It is built to sit *with* the
+ * structure rather than on top of it: dark glass, hairline rules, and an accent
+ * lifted from the birth end of the Colour Gradient, so the interface and the
+ * thing it controls belong to the same picture.
+ *
+ * Phone layout and the collapsed state are a separate issue. This is the desktop
+ * arrangement, kept narrow and out of the way.
+ */
+
+.panel {
+	position: fixed;
+	top: 1.25rem;
+	right: 1.25rem;
+	z-index: 1;
+
+	width: 15rem;
+	padding: 1rem 1.1rem 1.15rem;
+
+	/* Glass rather than a solid slab, so the structure stays visible behind it
+	 * and the panel reads as part of the same space. */
+	background: rgb(13 17 26 / 72%);
+	backdrop-filter: blur(14px);
+	border: 1px solid rgb(126 249 232 / 14%);
+	border-radius: 0.6rem;
+
+	font-family:
+		ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	color: #cdd6e4;
+
+	/* The panel is a surface for the pointer, not for the camera: gestures that
+	 * land here must not also orbit the structure behind it. */
+	touch-action: auto;
+	user-select: none;
+}
+
+.panel__title {
+	margin: 0 0 0.9rem;
+	font-size: 0.66rem;
+	font-weight: 600;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: #7ef9e8;
+}
+
+/* Each control is a label wrapping its slider, so it needs to be a block for the
+ * readout row to sit above the track rather than beside it. */
+.panel__control {
+	display: block;
+}
+
+.panel__control + .panel__control {
+	margin-top: 0.85rem;
+	padding-top: 0.85rem;
+	border-top: 1px solid rgb(205 214 228 / 8%);
+}
+
+.panel__label {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.5rem;
+	margin-bottom: 0.45rem;
+	font-size: 0.78rem;
+}
+
+.panel__value {
+	/* Tabular figures so the readout does not jitter sideways as digits change
+	 * while a slider is being dragged. */
+	font-variant-numeric: tabular-nums;
+	font-size: 0.72rem;
+	color: #9a8cff;
+}
+
+/* The paused readout is the one state worth spotting without reading, since it
+ * is the difference between the structure being stopped and merely slow. */
+.panel__value--paused {
+	color: #ff6b86;
+	letter-spacing: 0.06em;
+}
+
+/*
+ * Native range inputs, restyled.
+ *
+ * Native because they already do pointer capture, touch, keyboard arrows, and
+ * screen-reader semantics correctly — all of which a hand-drawn slider would
+ * have to reimplement, and #11 depends on the touch half working.
+ */
+.panel__slider {
+	appearance: none;
+	display: block;
+	width: 100%;
+	height: 1.25rem;
+	margin: 0;
+	background: transparent;
+	cursor: ew-resize;
+}
+
+.panel__slider::-webkit-slider-runnable-track {
+	height: 2px;
+	border-radius: 2px;
+	background: rgb(205 214 228 / 18%);
+}
+
+.panel__slider::-moz-range-track {
+	height: 2px;
+	border-radius: 2px;
+	background: rgb(205 214 228 / 18%);
+}
+
+.panel__slider::-webkit-slider-thumb {
+	appearance: none;
+	width: 0.85rem;
+	height: 0.85rem;
+	/* Centres the thumb on a 2px track. */
+	margin-top: -0.375rem;
+	border: 0;
+	border-radius: 50%;
+	background: #7ef9e8;
+	box-shadow: 0 0 0 0 rgb(126 249 232 / 30%);
+	transition: box-shadow 120ms ease-out;
+}
+
+.panel__slider::-moz-range-thumb {
+	width: 0.85rem;
+	height: 0.85rem;
+	border: 0;
+	border-radius: 50%;
+	background: #7ef9e8;
+	box-shadow: 0 0 0 0 rgb(126 249 232 / 30%);
+	transition: box-shadow 120ms ease-out;
+}
+
+/* A halo on contact rather than a size change, so the thumb does not appear to
+ * move as it is grabbed. */
+.panel__slider:hover::-webkit-slider-thumb,
+.panel__slider:active::-webkit-slider-thumb {
+	box-shadow: 0 0 0 0.35rem rgb(126 249 232 / 18%);
+}
+
+.panel__slider:hover::-moz-range-thumb,
+.panel__slider:active::-moz-range-thumb {
+	box-shadow: 0 0 0 0.35rem rgb(126 249 232 / 18%);
+}
+
+.panel__slider:focus-visible {
+	outline: none;
+}
+
+.panel__slider:focus-visible::-webkit-slider-thumb {
+	box-shadow: 0 0 0 0.35rem rgb(126 249 232 / 32%);
+}
+
+.panel__slider:focus-visible::-moz-range-thumb {
+	box-shadow: 0 0 0 0.35rem rgb(126 249 232 / 32%);
+}
+
+.panel__note {
+	margin: 0.9rem 0 0;
+	font-size: 0.66rem;
+	line-height: 1.45;
+	color: rgb(205 214 228 / 42%);
+}
