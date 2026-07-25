@@ -3,7 +3,7 @@
 Conway's Game of Life with the time axis drawn. Each generation is frozen as a horizontal layer and
 stacked on the one before it, so a pattern's whole history becomes a solid form you can orbit.
 
-**[See it running →](https://3dgol.miller-brettm.workers.dev)**
+**[See it running →](https://goluniverse.cc)**
 
 ![The structure building from a random seed](docs/build.gif)
 

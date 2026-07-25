@@ -27,7 +27,8 @@ What is built:
 | 3D | three.js 0.185.1 on `WebGLRenderer`, `@types/three` at a matching version |
 | Headless check | Playwright 1.62 — `pnpm smoke`, local only |
 | Deploy | Cloudflare Workers static assets via Wrangler |
-| Live URL | https://3dgol.miller-brettm.workers.dev |
+| Live URL | https://goluniverse.cc — apex only; `www` deliberately does not resolve |
+| Fallback URL | https://3dgol.miller-brettm.workers.dev — kept live alongside the custom domain |
 
 **Not automated:** CI does not run, and merging does not deploy. Deployment is `pnpm exec wrangler deploy`
 run locally. Automating it additionally requires a Cloudflare API token as a repository secret. Tracked

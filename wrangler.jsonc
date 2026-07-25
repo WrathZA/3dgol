@@ -3,6 +3,26 @@
 	"name": "3dgol",
 	"compatibility_date": "2026-07-25",
 
+	// The public home of the product. Cloudflare creates the DNS record and
+	// provisions the certificate from this entry, so the domain is configured
+	// here in the repository rather than by hand in the dashboard.
+	//
+	// Apex only, deliberately: one hostname is one canonical address for search
+	// engines to index, and `www` is left unresolved rather than serving the same
+	// page at a second address. Attaching `www` as well would need a canonical
+	// tag to stop the two competing.
+	"routes": [
+		{
+			"pattern": "goluniverse.cc",
+			"custom_domain": true
+		}
+	],
+
+	// The workers.dev URL stays live alongside the custom domain. It is the
+	// fallback while DNS and the certificate settle, and links already shared to
+	// it keep working.
+	"workers_dev": true,
+
 	// Static assets only — this project has no server-side code and no Worker
 	// script. Cloudflare serves the built `dist/` directory directly.
 	"assets": {
