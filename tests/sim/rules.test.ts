@@ -146,11 +146,30 @@ describe("Death by Old Age", () => {
 	});
 
 	it("destroys a block once its Cells reach Maximum Age", () => {
-		const block = gridFromPattern(["....", ".##.", ".##.", "...."]);
+		const block = gridFromPattern([
+			".....",
+			".##..",
+			".##..",
+			".....",
+			".....",
+		]);
 
 		// Ages run 1, 2, 3 — then every Cell is at the cap and dies together.
 		expect(aliveCells(advance(block, 2, 3))).toHaveLength(4);
-		expect(aliveCells(advance(block, 3, 3))).toHaveLength(0);
+
+		// The block's own four positions are gone. What remains is the shell its
+		// Explosions threw outward — none of the four revives the others, because
+		// every one of them also reached the cap.
+		const after = advance(block, 3, 3);
+		for (const [column, row] of [
+			[1, 1],
+			[2, 1],
+			[1, 2],
+			[2, 2],
+		] as const) {
+			expect(ageAt(after, column, row)).toBe(0);
+		}
+		expect(aliveCells(after).length).toBeGreaterThan(0);
 	});
 
 	it("rejects a Maximum Age below 1", () => {
