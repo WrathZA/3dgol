@@ -42,6 +42,8 @@ export interface StructureMesh {
 	writeLayer(slot: number, ages: Uint16Array, birthGeneration: number): void;
 	/** Updates the per-frame uniforms the shader derives everything else from. */
 	setFrameState(currentGeneration: number, layerCount: number): void;
+	/** Marks every instance unwritten, discarding the previous Run's Layers. */
+	resetLayers(): void;
 	dispose(): void;
 }
 
@@ -177,6 +179,26 @@ export function createStructureMesh(
 		setFrameState(currentGeneration, layerCount) {
 			currentGenerationUniform.value = currentGeneration;
 			layerCountUniform.value = layerCount;
+		},
+
+		/**
+		 * Clears every slot on Restart.
+		 *
+		 * The previous Run's instances would in fact hide themselves — a Generation
+		 * always lands in the same slot, so any stale slot is either already
+		 * overwritten or holds a birth Generation ahead of the current one, which
+		 * the shader's depth guard rejects. That reasoning is correct and fragile:
+		 * it silently stops holding if slot assignment ever changes. Restart is a
+		 * rare Viewer action, so the whole buffer is cleared outright instead.
+		 */
+		resetLayers() {
+			birthGenerations.fill(-1);
+			ages.fill(0);
+
+			birthAttribute.clearUpdateRanges();
+			birthAttribute.needsUpdate = true;
+			ageAttribute.clearUpdateRanges();
+			ageAttribute.needsUpdate = true;
 		},
 
 		dispose() {
