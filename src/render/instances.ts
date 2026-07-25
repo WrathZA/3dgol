@@ -378,6 +378,14 @@ const float EDGE_PIXELS = 1.2;
 /** How far the rim darkens the face colour. */
 const float EDGE_DARKEN = 0.35;
 
+/**
+ * Face coverage per screen pixel at which the edge starts and finishes fading
+ * out. Above the second value a Cell is small enough that drawing an edge on it
+ * only removes it from view.
+ */
+const float EDGE_FADE_START = 0.12;
+const float EDGE_FADE_END = 0.35;
+
 /** Position along the Colour Gradient, interpolated between adjacent stops. */
 vec3 gradientColor(float t) {
 	float scaled = clamp(t, 0.0, 1.0) * 4.0;
@@ -401,8 +409,16 @@ void main() {
 
 	// Distance to the nearest border of this face, in UV space.
 	float border = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
-	float rim = smoothstep(0.0, fwidth(border) * EDGE_PIXELS, border);
-	shade *= mix(EDGE_DARKEN, 1.0, rim);
+	float texelWidth = fwidth(border);
+	float rim = smoothstep(0.0, texelWidth * EDGE_PIXELS, border);
+
+	// Retire the edge as a Cell shrinks toward pixel size. Once one screen pixel
+	// spans a large share of the face, no interior is left for the rim to
+	// surround — every fragment reads as edge, the Cell becomes its own outline
+	// and darkens to near black. Zoomed out that turned the whole structure into
+	// a few faint specks.
+	float edgeStrength = 1.0 - smoothstep(EDGE_FADE_START, EDGE_FADE_END, texelWidth);
+	shade *= mix(1.0, mix(EDGE_DARKEN, 1.0, rim), edgeStrength);
 
 	// Mixing toward the background rather than using alpha keeps every Cell
 	// opaque, so depth sorting stays correct. Against a flat background the two

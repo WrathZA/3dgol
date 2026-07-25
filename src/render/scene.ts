@@ -1,4 +1,5 @@
 import { Color, PerspectiveCamera, Scene, WebGLRenderer } from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 /**
  * Renderer, scene, and camera for the structure.
@@ -44,6 +45,7 @@ export interface SceneHandle {
 	renderer: WebGLRenderer;
 	scene: Scene;
 	camera: PerspectiveCamera;
+	controls: OrbitControls;
 	/** Re-reads the canvas size and updates the camera and drawing buffer. */
 	resize(): void;
 	dispose(): void;
@@ -58,6 +60,25 @@ export interface SceneHandle {
  */
 const MAX_PIXEL_RATIO = 2;
 
+/**
+ * Closest the camera may come to its target, in Cell widths.
+ *
+ * Small enough that a single Cell fills a good part of the frame — the
+ * acceptance criterion is that individual Cells become legible, not merely
+ * distinguishable. Not zero: passing through the target inverts the controls
+ * and is disorienting to recover from.
+ */
+const NEAREST_APPROACH_IN_CELLS = 3;
+
+/**
+ * Furthest the camera may retreat, as a multiple of the structure's largest
+ * dimension.
+ *
+ * Enough headroom to see the whole silhouette with space around it. Bounded at
+ * all so the structure cannot be reduced to a speck the Viewer has to hunt for.
+ */
+const FURTHEST_RETREAT_IN_REACHES = 4;
+
 export function createScene(
 	canvas: HTMLCanvasElement,
 	extent: StructureExtent,
@@ -70,6 +91,30 @@ export function createScene(
 
 	const camera = new PerspectiveCamera(50, 1, 0.1, 4000);
 	frameStructure(camera, extent);
+
+	const controls = new OrbitControls(camera, canvas);
+	// Damping gives the structure weight — it keeps moving briefly after a drag
+	// ends rather than stopping dead. It requires `update()` every frame.
+	controls.enableDamping = true;
+	controls.dampingFactor = 0.08;
+
+	// Look at the middle of the Stack's height rather than its base, matching
+	// where `frameStructure` aimed the camera.
+	const stackHeight = extent.depthWindow * LAYER_SPACING;
+	controls.target.set(0, stackHeight * 0.5, 0);
+
+	// Deliberately *not* clamping the polar angle. Many projects stop the camera
+	// passing under the floor; here "from below" is an acceptance criterion, and
+	// the underside of the Stack is worth seeing.
+
+	// Both limits are derived from the structure rather than picked by feel,
+	// because each one can fail a criterion on its own. Too far a near limit and
+	// individual Cells never become legible; too near a far limit and the whole
+	// silhouette never fits in frame.
+	const footprint = Math.max(extent.width, extent.height) * CELL_SPACING;
+	const reach = Math.max(footprint, stackHeight);
+	controls.minDistance = CELL_SPACING * NEAREST_APPROACH_IN_CELLS;
+	controls.maxDistance = reach * FURTHEST_RETREAT_IN_REACHES;
 
 	const resize = (): void => {
 		const width = canvas.clientWidth;
@@ -89,8 +134,10 @@ export function createScene(
 		renderer,
 		scene,
 		camera,
+		controls,
 		resize,
 		dispose: () => {
+			controls.dispose();
 			renderer.dispose();
 		},
 	};
