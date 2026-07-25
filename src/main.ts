@@ -157,7 +157,12 @@ let run = startRun(undefined);
  */
 const restart = { requested: false };
 
-createControlPanel(settings);
+const panel = createControlPanel(settings, restart, {
+	// Read on demand rather than passed by value: the panel compares the staged
+	// Grid against the running one to decide whether a Restart is pending, and the
+	// running one changes underneath it.
+	runningGrid: () => ({ width: run.width, height: run.height }),
+});
 
 let lastFrameTime = performance.now();
 
@@ -179,12 +184,16 @@ function restartRun(): void {
 
 	if (dimensionsChanged) {
 		run = startRun(run);
-		return;
+	} else {
+		run.simulation.restart();
+		run.view.reset();
+		run.accumulated = 0;
 	}
 
-	run.simulation.restart();
-	run.view.reset();
-	run.accumulated = 0;
+	// The staged dimensions are the running ones now, so the panel's pending marks
+	// have to clear — including on the path where nothing about them changed, since
+	// the Viewer may have moved a slider and moved it back.
+	panel.refresh();
 }
 
 /**

@@ -82,6 +82,13 @@
 	letter-spacing: 0.06em;
 }
 
+/* A staged value waiting for a Restart. Dimmed rather than alarming: nothing is
+ * wrong, the value simply has not landed yet. */
+.panel__value--pending {
+	color: rgb(154 140 255 / 62%);
+	font-style: italic;
+}
+
 /*
  * Native range inputs, restyled.
  *
@@ -156,6 +163,65 @@
 
 .panel__slider:focus-visible::-moz-range-thumb {
 	box-shadow: 0 0 0 0.35rem rgb(126 249 232 / 32%);
+}
+
+/*
+ * Restart.
+ *
+ * The only control here that does something rather than sets something, so it is
+ * shaped differently from the sliders — a full-width surface with a border,
+ * reading as a button rather than as another value to adjust.
+ */
+.panel__restart {
+	display: block;
+	width: 100%;
+	margin-top: 1rem;
+	padding: 0.5rem 0.75rem;
+
+	font: inherit;
+	font-size: 0.76rem;
+	letter-spacing: 0.02em;
+	color: #cdd6e4;
+	text-align: center;
+
+	background: rgb(126 249 232 / 6%);
+	border: 1px solid rgb(126 249 232 / 22%);
+	border-radius: 0.35rem;
+	cursor: pointer;
+	transition:
+		background-color 120ms ease-out,
+		border-color 120ms ease-out;
+}
+
+.panel__restart:hover {
+	background: rgb(126 249 232 / 12%);
+	border-color: rgb(126 249 232 / 38%);
+}
+
+.panel__restart:active {
+	background: rgb(126 249 232 / 18%);
+}
+
+.panel__restart:focus-visible {
+	outline: none;
+	border-color: #7ef9e8;
+	box-shadow: 0 0 0 0.2rem rgb(126 249 232 / 22%);
+}
+
+/*
+ * A staged Grid change is waiting on this button, so the button says so and
+ * draws the eye. Without it a dimension change is invisible until the Viewer
+ * happens to restart, which reads as the slider having done nothing.
+ */
+.panel__restart--pending {
+	color: #d873f5;
+	background: rgb(216 115 245 / 10%);
+	border-color: rgb(216 115 245 / 42%);
+}
+
+.panel__restart--pending:hover {
+	background: rgb(216 115 245 / 18%);
+	border-color: rgb(216 115 245 / 60%);
 }
 
 .panel__note {
