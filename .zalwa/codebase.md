@@ -4,12 +4,14 @@ Live map of project layout, components, and patterns. Seeded at bootstrap; updat
 
 ## Current state
 
-**Toolchain, deployment path, and the simulation core exist. Nothing is rendered yet.**
+**The product renders.** Generations accumulate into a structure you can look at.
 
-Issue #3 scaffolded the project and proved the deployment path. Issue #4 built the simulation — the part
-that produces generations. Issue #5 added the bounded history window, so generations now accumulate as
-layers. Nothing imports `src/sim/` yet, so the deployed bundle is unchanged and the modules are
-tree-shaken out of the build; rendering (#6) wires them up.
+Issue #3 scaffolded the project and proved the deployment path. #4 built the simulation, #5 the bounded
+history window, and #6 drew it — one instanced draw call with placement derived in the vertex shader.
+
+Not yet built: camera movement (#7), colour and fade (#8), any controls (#9, #10), phone layout (#11), the
+drawing budget (#12), and link previews (#13). The structure is uniform blue, viewed from a fixed angle,
+and ends abruptly at the bottom — all deliberate, all owned by those issues.
 
 What is built:
 
@@ -20,6 +22,8 @@ What is built:
 | Package manager | pnpm 10.33.0, pinned via `packageManager`; Node pinned in `.nvmrc` |
 | Lint / format | Biome 2.5.5, pinned exact, scoped to `src/`, `tests/`, and config files |
 | Tests | Vitest 4.1.10 — one toolchain smoke test |
+| 3D | three.js 0.185.1 on `WebGLRenderer`, `@types/three` at a matching version |
+| Headless check | Playwright 1.62 — `pnpm smoke`, local only |
 | Deploy | Cloudflare Workers static assets via Wrangler |
 | Live URL | https://3dgol.miller-brettm.workers.dev |
 
@@ -32,23 +36,30 @@ Everything under "Planned layout" below that is not listed above is still unbuil
 ## Actual files
 
 ```
-index.html            Placeholder page — title, description, #app mount point
+index.html            Full-viewport canvas (#viewport), meta tags, minimal inline CSS
 src/
-  main.ts             Mounts the placeholder message; throws if #app is absent
-  placeholder.ts      Returns the placeholder string; stands in until rendering lands
+  main.ts             Composition root — rAF loop, accumulator-driven generations
+  settings.ts         Starting values for grid, depth, maximum age, and speed
   sim/                Pure simulation — imports nothing outside itself
     grid.ts           Grid storage, index arithmetic, Bounded Edge, neighbour counting
     rules.ts          B3/S23 + age increment + Death by Old Age
     stack.ts          LayerStack — ring buffer, Depth Window, retirement
     simulation.ts     Run state — generation counter, Maximum Age, Stack, advance(), restart()
+  render/             Drawing — may read the simulation, never the reverse
+    scene.ts          Renderer, fixed angled camera, resize, spacing constants
+    instances.ts      Instanced geometry, GLSL shaders, ring slot arithmetic
+    structure.ts      Binds a Run's Stack to the instance buffer
+e2e/
+  smoke.mjs           Headless render + screenshot — local only, never CI
 tests/
-  placeholder.test.ts Toolchain smoke test — runner, @/ alias, module import
   sim/
     helpers.ts        Pattern-to-Grid fixtures and comparison helpers (not a test file)
     grid.test.ts      Dimensions, Bounded Edge, neighbour counting
     rules.test.ts     Golden Life patterns, Age semantics, Death by Old Age
     stack.test.ts     Retirement, Depth Window resize, constant memory, copy-not-reference
     simulation.test.ts Run lifecycle, Seed density, determinism, Maximum Age, Stack integration
+  render/
+    instances.test.ts Ring slot arithmetic — the only testable part of rendering
 biome.json            Scoped to src/, tests/, and config files only
 vite.config.ts        @/ alias + Vitest config (tests live in tests/**/*.test.ts)
 tsconfig.json         strict, noUncheckedIndexedAccess, @/ paths
@@ -123,19 +134,28 @@ would discard the main advantage of this design.
 
 ### Derive-from-uniform
 
-Each instance carries its grid position, birth generation, and age. Per frame, exactly one uniform is
-written: `currentGeneration`. The vertex shader derives from it:
+**Implemented in #6.** Each instance carries its grid position (written once), birth generation, and age.
+Per frame, exactly two uniforms change: `uCurrentGeneration` and `uLayerCount`. The vertex shader derives:
 
-| Derived | From |
-|---------|------|
-| Vertical position | `currentGeneration − birthGeneration`, mapped to layer height |
-| Opacity | A fade curve over that same difference — produces the dissolving bottom edge |
-| Colour | `age / A` along the gradient |
-| Scale | The cell-size setting |
+| Derived | From | State |
+|---------|------|-------|
+| Vertical position | `(layerCount − 1 − depth) × LAYER_SPACING`, where `depth = currentGeneration − birthGeneration` | built |
+| Visibility | Age above zero, birth generation written, and depth inside the window | built |
+| Opacity | A fade curve over depth — the dissolving bottom edge | #8 |
+| Colour | `age / A` along the gradient | #8 |
+| Scale | The cell-size setting | #9 |
+
+The height formula produces the two phases the PRD describes: while the Stack fills, `layerCount` grows
+and the structure genuinely rises; once full it holds, and each Layer sinks a step per Generation until it
+drops off the bottom.
 
 The consequence, and the reason the design exists: per-frame CPU work is constant regardless of how many
 instances are alive. Moving any of this back to the CPU reintroduces per-instance per-frame work and
 undoes it.
+
+**`mesh.frustumCulled` must stay `false`.** three.js computes bounding volumes from vertex positions, and
+every instance here is placed by the shader — leaving culling on makes the whole structure vanish with no
+error to explain it.
 
 ## Components
 
@@ -215,16 +235,46 @@ other here; this is the deliberate resolution.
 Exposes: `Simulation`, `SimulationOptions`, `RandomSource`, `DEFAULT_SEED_DENSITY`,
 `DEFAULT_DEPTH_WINDOW`.
 
-### `src/placeholder.ts`
+### `src/render/scene.ts`
 
-Exists only so the deployment path could be proven and the smoke test has something to import. Expected to
-be deleted once rendering lands.
+Owns the renderer, the camera, and the two spacing constants everything else is measured against.
+
+`CELL_SPACING` (1) and `LAYER_SPACING` (0.7) set the structure's proportions. The camera is fixed and
+angled — looking straight down an axis would flatten a glider's diagonal into a dot. Device pixel ratio is
+clamped at 2; uncapped on a modern phone it triples, multiplying fragment work ninefold for a difference
+nobody can see on small blocks.
+
+### `src/render/instances.ts`
+
+Owns the single instanced draw and the shaders that place it.
+
+**`LAYER_THICKNESS_RATIO` (0.4) is the most consequential number in the codebase.** It sets how tall a
+drawn Cell is relative to the distance between Layers. Near 1, Layers touch and the Stack fuses into one
+solid mass — history becomes invisible, which is the one thing this product exists to show. This was
+shipped wrong once and caught only by screenshotting it; every automated check passed.
+
+Instance count is `width × height × depthWindow`. Dead Cells occupy instances and collapse to zero scale
+rather than being compacted out — fixed slots are what make the ring indexing work.
+
+`slotRange` and `slotForGeneration` are pure and exported: the ring arithmetic is the only part of the
+rendering layer verifiable without a GPU and an eye, so it is tested directly.
+
+### `src/render/structure.ts`
+
+Owns the bookkeeping between a Run's Stack and the instance buffer — which slot a Generation lands in, and
+when a slot needs rewriting. One Layer written per Generation, one uniform per frame, never anything
+proportional to Stack size.
 
 ## Known risks
 
-- **The instance cap has no number.** Grid dimensions × depth determines instance count, and there is no
-  server to absorb it. A single conservative cap applies to all devices, and its value can only be set by
-  measuring on real low-end hardware.
+- **The instance cap has no number.** Defaults are 48 × 48 × 60 — about 138,000 instances — chosen to look
+  right, not measured. Grid dimensions × depth determines the draw, and there is no server to absorb it. A
+  single conservative cap set by measurement on real low-end hardware is #12.
+- **Smoothness has never been observed on a real GPU.** Every render check so far ran against a software
+  rasteriser, whose frame timings mean nothing. The design keeps per-frame CPU work constant, but that is
+  reasoning, not evidence.
 - **The vertex shader is unreachable by tests.** It is the heart of the visual output and no unit test can
-  verify it. Mitigation: keep math in TypeScript wherever it can live there instead of GLSL.
-- **`@types/three` versions independently of `three`.** Upgrade the two together and deliberately.
+  verify it. Mitigations: keep math in TypeScript wherever it can live there, and run `pnpm smoke` after
+  touching anything that affects proportions.
+- **`@types/three` versions independently of `three`.** Currently aligned at 0.185.1. Upgrade the two
+  together and deliberately.
