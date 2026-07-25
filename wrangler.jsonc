@@ -3,15 +3,20 @@
 	"name": "3dgol",
 	"compatibility_date": "2026-07-25",
 
+	// Keeps the `workers.dev` address alive. This is NOT a default: the moment
+	// `routes` exists, wrangler disables workers.dev unless it is set explicitly,
+	// so a custom domain that fails to attach takes the whole site offline with
+	// it. Learned by doing exactly that.
+	"workers_dev": true,
+
 	// Custom domains. Cloudflare creates the DNS records and provisions
 	// certificates itself, so nothing here needs a DNS entry adding by hand —
-	// but the zone must already exist in the same account, with the domain
-	// delegated to Cloudflare's nameservers. Deploying before that fails.
-	//
-	// The `3dgol.<subdomain>.workers.dev` address keeps working alongside these.
+	// but the zone must already exist in the account *and be active*. A zone
+	// still waiting on registry delegation is not yet active, and attaching to
+	// it returns 400.
 	"routes": [
-		{ "pattern": "goltime.win", "custom_domain": true },
-		{ "pattern": "www.goltime.win", "custom_domain": true }
+		{ "pattern": "goltime.win", "zone_name": "goltime.win", "custom_domain": true },
+		{ "pattern": "www.goltime.win", "zone_name": "goltime.win", "custom_domain": true }
 	],
 
 	// Static assets only — this project has no server-side code and no Worker
