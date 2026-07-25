@@ -239,6 +239,7 @@ uniform float uDepthWindow;
 uniform float uLayerSpacing;
 
 varying vec3 vNormal;
+varying vec2 vUv;
 
 void main() {
 	float depth = uCurrentGeneration - aBirthGeneration;
@@ -253,31 +254,46 @@ void main() {
 		+ vec3(aGridPosition.x, y, aGridPosition.y);
 
 	vNormal = normal;
+	vUv = uv;
 
 	gl_Position = projectionMatrix * modelViewMatrix * vec4(placed, 1.0);
 }
 `;
 
 /**
- * One colour, shaded by which way a face points.
+ * Face shading plus a drawn edge on every Cell.
  *
- * Colour as meaning belongs to the next issue. What this has to do is make the
- * structure read as solid forms rather than a flat silhouette — every face the
- * same brightness would turn a field of boxes into one undifferentiated mass.
- * A fixed direction is enough; there is no light in the scene to configure.
+ * Two separate jobs. Directional shading separates the faces of one cube so it
+ * reads as a solid form. The edge separates *adjacent* cubes — without it, two
+ * neighbours sharing a colour merge into one shape and the lattice disappears.
+ *
+ * The rim is widened by `fwidth`, so it stays roughly a constant number of
+ * pixels whether a Cell is close or far away. A fixed width in UV space would
+ * turn distant Cells into solid outline and near ones into a hairline.
  */
 const FRAGMENT_SHADER = /* glsl */ `
 uniform vec3 uCellColor;
 
 varying vec3 vNormal;
+varying vec2 vUv;
 
 const vec3 LIGHT_DIRECTION = normalize(vec3(0.4, 1.0, 0.7));
+
+/** Rim width in pixels. */
+const float EDGE_PIXELS = 1.2;
+/** How far the rim darkens the face colour. */
+const float EDGE_DARKEN = 0.35;
 
 void main() {
 	float facing = dot(normalize(vNormal), LIGHT_DIRECTION) * 0.5 + 0.5;
 	// Floor well above zero so downward faces stay legible rather than reading
 	// as holes in the structure.
 	float shade = mix(0.45, 1.0, facing);
+
+	// Distance to the nearest border of this face, in UV space.
+	float border = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+	float rim = smoothstep(0.0, fwidth(border) * EDGE_PIXELS, border);
+	shade *= mix(EDGE_DARKEN, 1.0, rim);
 
 	gl_FragColor = vec4(uCellColor * shade, 1.0);
 }
