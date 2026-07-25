@@ -7,11 +7,11 @@ Live map of project layout, components, and patterns. Seeded at bootstrap; updat
 **The product renders.** Generations accumulate into a structure you can look at.
 
 Issue #3 scaffolded the project and proved the deployment path. #4 built the simulation, #5 the bounded
-history window, #6 drew it, and #8 gave it colour, fade, and cubic edge-drawn cells.
+history window, #6 drew it, #8 gave it colour, fade, and cubic edge-drawn cells, and #7 made it something
+you can walk around.
 
-Not yet built: camera movement (#7), any controls (#9, #10), phone layout (#11), the drawing budget (#12),
-and link previews (#13). The structure is viewed from one fixed angle and nothing can be adjusted — both
-deliberate, both owned by those issues.
+Not yet built: any controls (#9, #10), phone layout (#11), the drawing budget (#12), and link previews
+(#13). Nothing can be adjusted at runtime — deliberate, and owned by those issues.
 
 What is built:
 
@@ -46,7 +46,7 @@ src/
     stack.ts          LayerStack — ring buffer, Depth Window, retirement
     simulation.ts     Run state — generation counter, Maximum Age, Stack, advance(), restart()
   render/             Drawing — may read the simulation, never the reverse
-    scene.ts          Renderer, fixed angled camera, resize, spacing constants
+    scene.ts          Renderer, camera, OrbitControls, resize, spacing constants
     instances.ts      Instanced geometry, GLSL shaders, ring slot arithmetic
     structure.ts      Binds a Run's Stack to the instance buffer
 e2e/
@@ -237,7 +237,20 @@ Exposes: `Simulation`, `SimulationOptions`, `RandomSource`, `DEFAULT_SEED_DENSIT
 
 ### `src/render/scene.ts`
 
-Owns the renderer, the camera, and the constants everything else is measured against.
+Owns the renderer, the camera, the camera controls, and the constants everything else is measured against.
+
+**`OrbitControls`** provides orbit, pan, zoom, and touch. Three details are load-bearing:
+
+- **The polar angle is deliberately unclamped** — the reflex is to stop a camera passing under the floor,
+  but viewing the Stack from below is an acceptance criterion.
+- **Distance limits derive from the structure's extent**, not from feel. Each bound can fail a criterion
+  alone: too far a near limit and Cells never become legible, too near a far limit and the silhouette
+  never fits.
+- **The target does not follow the growing Stack.** It sits at the mid-height of a full Stack, so while
+  the Stack fills the structure sits low in frame. Auto-following would fight the Viewer mid-drag.
+
+Damping requires `controls.update()` every frame — `main.ts` calls it outside the generation accumulator,
+so navigation and the Run cannot interfere in either direction.
 
 `CELL_SPACING` and `LAYER_SPACING` are **both 1** — the lattice is isotropic, so a Cell is a cube and the
 gap above it matches the gap beside it. The camera is fixed and angled; looking straight down an axis
@@ -264,6 +277,12 @@ heavily skewed young — most Cells die within a few Generations — so mapping 
 end of the palette unused and paints nearly everything the birth colour. The curve spreads early Ages
 across more of the gradient without moving either endpoint. Raising it toward 1 quietly undoes the
 palette.
+
+**The Cell edge must retire as Cells shrink.** `EDGE_FADE_START`/`EDGE_FADE_END` fade the rim out once one
+screen pixel spans a large share of a face. Without them the rim swallows the Cell whole at distance —
+every fragment reads as edge, the Cell becomes its own outline and darkens to near black, and zooming out
+makes the structure vanish. This shipped broken in #8 and was only found in #7, when the camera could
+first move far enough to expose it.
 
 **Two constants are kept in sync by hand.** `FADE_START` appears in both shaders and they must dissolve
 together. The gradient stop count appears in TypeScript and literally in the GLSL uniform declaration —
@@ -300,3 +319,7 @@ proportional to Stack size.
 - **Darkening terms compound.** Face shading, the edge rim, and the depth fade all reduce the same pixel.
   Each is defensible alone; together they once turned the middle of the structure to mud. Check the render
   before adding a fourth.
+- **Screen-space effects need checking across the whole camera range.** The edge rim was correct at the
+  fixed distance #6 and #8 could reach and wrong once #7 allowed zooming out. Anything using `fwidth` or
+  otherwise scaling with apparent size should be looked at from near, default, and far — the smoke script
+  defaults to one distance only.
