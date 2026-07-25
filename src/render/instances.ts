@@ -1,6 +1,7 @@
 import {
 	BoxGeometry,
 	Color,
+	DynamicDrawUsage,
 	InstancedBufferAttribute,
 	InstancedBufferGeometry,
 	Mesh,
@@ -139,8 +140,9 @@ export function createStructureMesh(
 	const ages = new Float32Array(instanceCount);
 	const birthAttribute = new InstancedBufferAttribute(birthGenerations, 1);
 	const ageAttribute = new InstancedBufferAttribute(ages, 1);
-	birthAttribute.setUsage(35048 /* DynamicDrawUsage */);
-	ageAttribute.setUsage(35048 /* DynamicDrawUsage */);
+	// Rewritten every Generation, so the driver should not treat them as static.
+	birthAttribute.setUsage(DynamicDrawUsage);
+	ageAttribute.setUsage(DynamicDrawUsage);
 	geometry.setAttribute("aBirthGeneration", birthAttribute);
 	geometry.setAttribute("aAge", ageAttribute);
 
