@@ -7,11 +7,11 @@ Live map of project layout, components, and patterns. Seeded at bootstrap; updat
 **The product renders.** Generations accumulate into a structure you can look at.
 
 Issue #3 scaffolded the project and proved the deployment path. #4 built the simulation, #5 the bounded
-history window, and #6 drew it — one instanced draw call with placement derived in the vertex shader.
+history window, #6 drew it, and #8 gave it colour, fade, and cubic edge-drawn cells.
 
-Not yet built: camera movement (#7), colour and fade (#8), any controls (#9, #10), phone layout (#11), the
-drawing budget (#12), and link previews (#13). The structure is uniform blue, viewed from a fixed angle,
-and ends abruptly at the bottom — all deliberate, all owned by those issues.
+Not yet built: camera movement (#7), any controls (#9, #10), phone layout (#11), the drawing budget (#12),
+and link previews (#13). The structure is viewed from one fixed angle and nothing can be adjusted — both
+deliberate, both owned by those issues.
 
 What is built:
 
@@ -141,8 +141,8 @@ Per frame, exactly two uniforms change: `uCurrentGeneration` and `uLayerCount`. 
 |---------|------|-------|
 | Vertical position | `(layerCount − 1 − depth) × LAYER_SPACING`, where `depth = currentGeneration − birthGeneration` | built |
 | Visibility | Age above zero, birth generation written, and depth inside the window | built |
-| Opacity | A fade curve over depth — the dissolving bottom edge | #8 |
-| Colour | `age / A` along the gradient | #8 |
+| Dissolve | A fade toward `BACKGROUND_COLOR` plus a shrink, both over depth | built |
+| Colour | Age along `GRADIENT_STOPS`, curved by `AGE_GRADIENT_CURVE` | built |
 | Scale | The cell-size setting | #9 |
 
 The height formula produces the two phases the PRD describes: while the Stack fills, `layerCount` grows
@@ -237,21 +237,37 @@ Exposes: `Simulation`, `SimulationOptions`, `RandomSource`, `DEFAULT_SEED_DENSIT
 
 ### `src/render/scene.ts`
 
-Owns the renderer, the camera, and the two spacing constants everything else is measured against.
+Owns the renderer, the camera, and the constants everything else is measured against.
 
-`CELL_SPACING` (1) and `LAYER_SPACING` (0.7) set the structure's proportions. The camera is fixed and
-angled — looking straight down an axis would flatten a glider's diagonal into a dot. Device pixel ratio is
-clamped at 2; uncapped on a modern phone it triples, multiplying fragment work ninefold for a difference
-nobody can see on small blocks.
+`CELL_SPACING` and `LAYER_SPACING` are **both 1** — the lattice is isotropic, so a Cell is a cube and the
+gap above it matches the gap beside it. The camera is fixed and angled; looking straight down an axis
+would flatten a glider's diagonal into a dot. Device pixel ratio is clamped at 2.
+
+`BACKGROUND_COLOR` is shared with the shader on purpose: the renderer clears to it and descending Layers
+mix toward it, so a Layer leaving the window lands exactly on nothing. **If the two ever diverge, the
+dissolve becomes a visible grey floor.**
 
 ### `src/render/instances.ts`
 
 Owns the single instanced draw and the shaders that place it.
 
-**`LAYER_THICKNESS_RATIO` (0.4) is the most consequential number in the codebase.** It sets how tall a
-drawn Cell is relative to the distance between Layers. Near 1, Layers touch and the Stack fuses into one
-solid mass — history becomes invisible, which is the one thing this product exists to show. This was
-shipped wrong once and caught only by screenshotting it; every automated check passed.
+**`DEFAULT_CELL_SCALE` (0.55) is the most consequential number in the codebase.** On an isotropic lattice
+it sets the gap in every direction at once. Near 1, Cells touch and the Stack fuses into one solid mass —
+history becomes invisible, which is the one thing this product exists to show. This was shipped wrong once
+and caught only by screenshotting it; every automated check passed.
+
+**`GRADIENT_STOPS`** is the Colour Gradient, birth to death. A Cell traverses it exactly once over its
+lifetime, so the palette is a countdown rather than decoration.
+
+**`AGE_GRADIENT_CURVE` (0.45) exists because a linear map does not work.** Life's Age distribution is
+heavily skewed young — most Cells die within a few Generations — so mapping Age linearly leaves the far
+end of the palette unused and paints nearly everything the birth colour. The curve spreads early Ages
+across more of the gradient without moving either endpoint. Raising it toward 1 quietly undoes the
+palette.
+
+**Two constants are kept in sync by hand.** `FADE_START` appears in both shaders and they must dissolve
+together. The gradient stop count appears in TypeScript and literally in the GLSL uniform declaration —
+that one throws at construction on mismatch; `FADE_START` does not, and cannot.
 
 Instance count is `width × height × depthWindow`. Dead Cells occupy instances and collapse to zero scale
 rather than being compacted out — fixed slots are what make the ring indexing work.
@@ -278,3 +294,9 @@ proportional to Stack size.
   touching anything that affects proportions.
 - **`@types/three` versions independently of `three`.** Currently aligned at 0.185.1. Upgrade the two
   together and deliberately.
+- **The dissolve depends on a flat background.** Fading toward `BACKGROUND_COLOR` keeps Cells opaque and
+  correctly depth-sorted, which real transparency across 138,000 unsorted instances would not. A gradient
+  or image behind the structure would force that decision to be revisited.
+- **Darkening terms compound.** Face shading, the edge rim, and the depth fade all reduce the same pixel.
+  Each is defensible alone; together they once turned the middle of the structure to mud. Check the render
+  before adding a fourth.
