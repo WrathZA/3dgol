@@ -20,6 +20,17 @@
 	width: 15rem;
 	padding: 1rem 1.1rem 1.15rem;
 
+	/*
+	 * The panel is fixed, so anything past the bottom of the viewport is simply
+	 * unreachable — there is no page to scroll. With six controls and a button it
+	 * is tall enough that a short window puts Restart off the end, so it is bounded
+	 * to the viewport and scrolls within itself instead. Contained overscroll keeps
+	 * that scroll from bubbling out and dragging the page around behind it.
+	 */
+	max-height: calc(100vh - 2.5rem);
+	overflow-y: auto;
+	overscroll-behavior: contain;
+
 	/* Glass rather than a solid slab, so the structure stays visible behind it
 	 * and the panel reads as part of the same space. */
 	background: rgb(13 17 26 / 72%);
