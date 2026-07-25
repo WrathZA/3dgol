@@ -197,4 +197,104 @@ describe("Simulation", () => {
 			}
 		});
 	});
+
+	describe("Stack", () => {
+		it("freezes the Seed as the first Layer", () => {
+			// Generation 0 is a Generation like any other. Skipping it would leave
+			// the bottom of a fresh structure missing the state it grew from.
+			const simulation = new Simulation({
+				width: 8,
+				height: 8,
+				maximumAge: 10,
+				depthWindow: 5,
+				random: seededRandom(21),
+			});
+
+			expect(simulation.stack.depth).toBe(1);
+			expect(simulation.stack.newestGeneration).toBe(0);
+			expect(Array.from(simulation.stack.layerAt(0))).toEqual(
+				Array.from(simulation.grid.ages),
+			);
+		});
+
+		it("adds exactly one Layer per Generation", () => {
+			const simulation = new Simulation({
+				width: 8,
+				height: 8,
+				maximumAge: 10,
+				depthWindow: 10,
+				random: seededRandom(22),
+			});
+
+			simulation.advance();
+			simulation.advance();
+			simulation.advance();
+
+			// Three advances plus the Seed.
+			expect(simulation.stack.depth).toBe(4);
+			expect(simulation.stack.newestGeneration).toBe(3);
+			expect(simulation.stack.generationAt(3)).toBe(0);
+		});
+
+		it("holds the Depth Window once full, however long the Run goes", () => {
+			const simulation = new Simulation({
+				width: 8,
+				height: 8,
+				maximumAge: 10,
+				depthWindow: 6,
+				random: seededRandom(23),
+			});
+
+			const bytesAtStart = simulation.stack.byteLength;
+
+			for (let generation = 0; generation < 500; generation++) {
+				simulation.advance();
+			}
+
+			expect(simulation.stack.depth).toBe(6);
+			expect(simulation.stack.byteLength).toBe(bytesAtStart);
+			expect(simulation.stack.newestGeneration).toBe(500);
+		});
+
+		it("empties the Stack and returns to Generation 0 on Restart", () => {
+			const simulation = new Simulation({
+				width: 8,
+				height: 8,
+				maximumAge: 10,
+				depthWindow: 5,
+				random: seededRandom(24),
+			});
+
+			for (let generation = 0; generation < 20; generation++) {
+				simulation.advance();
+			}
+			expect(simulation.stack.depth).toBe(5);
+
+			simulation.restart();
+
+			// Only the fresh Seed remains.
+			expect(simulation.generation).toBe(0);
+			expect(simulation.stack.depth).toBe(1);
+			expect(simulation.stack.newestGeneration).toBe(0);
+		});
+
+		it("keeps each Layer matching the Generation it froze", () => {
+			const simulation = new Simulation({
+				width: 6,
+				height: 6,
+				maximumAge: 10,
+				depthWindow: 4,
+				random: seededRandom(25),
+			});
+
+			const atGenerationOne = Array.from(simulation.grid.ages);
+			simulation.advance();
+			simulation.advance();
+
+			// The Seed is now at depth 2 and must still hold Generation 0's state,
+			// even though the Simulation has reused its Grid buffers since.
+			expect(Array.from(simulation.stack.layerAt(2))).toEqual(atGenerationOne);
+			expect(simulation.stack.generationAt(2)).toBe(0);
+		});
+	});
 });
