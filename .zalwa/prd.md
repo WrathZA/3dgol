@@ -31,6 +31,8 @@ it builds.
 
 ### The rule
 
+- #26 feat: a cell dying of old age explodes into its neighbours
+
 Standard Conway (B3/S23) on a flat grid, plus one addition:
 
 - **Birth** — a dead cell with exactly 3 live neighbours becomes alive, at age 1.
