@@ -1,10 +1,6 @@
 import { createScene } from "@/render/scene";
 import { createStructureView } from "@/render/structure";
-import {
-	clampLiveSettings,
-	DEFAULT_SETTINGS,
-	SETTING_BOUNDS,
-} from "@/settings";
+import { clampSettings, DEFAULT_SETTINGS, SETTING_BOUNDS } from "@/settings";
 import { advanceClock, retimeAccumulator } from "@/sim/clock";
 import { Simulation } from "@/sim/simulation";
 import { createControlPanel } from "@/ui/panel";
@@ -30,7 +26,7 @@ if (canvas === null) {
 	throw new Error("Expected a canvas with id 'viewport' in index.html");
 }
 
-const settings = clampLiveSettings(DEFAULT_SETTINGS);
+const settings = clampSettings(DEFAULT_SETTINGS);
 
 const simulation = new Simulation({
 	width: settings.gridWidth,

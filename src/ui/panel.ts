@@ -1,8 +1,8 @@
 import "@/ui/panel.css";
 
 import {
+	type BoundedSetting,
 	clampSetting,
-	type LiveSetting,
 	SETTING_BOUNDS,
 	type SettingBound,
 	type Settings,
@@ -32,7 +32,7 @@ export interface ControlPanel {
 
 /** One control: which setting it moves, and how it is described. */
 interface ControlSpec {
-	setting: LiveSetting;
+	setting: BoundedSetting;
 	label: string;
 	/** Renders the current value for the readout beside the label. */
 	format(value: number): string;
