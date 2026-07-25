@@ -49,23 +49,15 @@ export interface StructureMesh {
 }
 
 /**
- * Default fraction of a Cell's spacing that the drawn box occupies.
+ * Edge length of a drawn Cell, as a fraction of the lattice spacing.
  *
- * Well under 1 on purpose. At near-touching sizes a busy Generation becomes an
- * unbroken sheet, and the whole point is that dead positions draw nothing — a
- * structure you cannot see into has no shape.
+ * A Cell is a cube on an isotropic lattice, so this one number sets the gap in
+ * every direction at once. It is the most consequential value in the codebase:
+ * near 1, Cells touch and the Stack fuses into a solid mass — history becomes
+ * invisible, which is the one thing this product exists to show. Around half,
+ * each Generation reads as its own stratum and you can see into the structure.
  */
-const DEFAULT_CELL_SCALE = 0.6;
-
-/**
- * Height of a drawn Cell as a fraction of the distance between Layers.
- *
- * The single most important number for whether the product works. Near 1, Layers
- * touch and the Stack fuses into one solid mass — history becomes invisible,
- * which is the one thing this product exists to show. Well under half, each
- * Generation reads as its own stratum with clear space above and below it.
- */
-const LAYER_THICKNESS_RATIO = 0.4;
+const DEFAULT_CELL_SCALE = 0.55;
 
 /**
  * Instance index where a slot's Cells begin.
@@ -109,11 +101,9 @@ export function createStructureMesh(
 	const instanceCount = cellsPerLayer * depthWindow;
 
 	const geometry = new InstancedBufferGeometry();
-	const box = new BoxGeometry(
-		cellScale * CELL_SPACING,
-		LAYER_SPACING * LAYER_THICKNESS_RATIO,
-		cellScale * CELL_SPACING,
-	);
+	// A cube: equal on every axis, because the lattice is isotropic.
+	const edge = cellScale * CELL_SPACING;
+	const box = new BoxGeometry(edge, edge, edge);
 	geometry.index = box.index;
 	geometry.attributes = box.attributes;
 	geometry.instanceCount = instanceCount;
