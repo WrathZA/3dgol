@@ -64,6 +64,12 @@ function frame(now: number): void {
 		view.syncLatestLayer();
 	}
 
+	// Camera movement is entirely separate from the Run. Generations advance on
+	// their own accumulator above, so orbiting, panning or zooming never slows,
+	// stalls or resumes the simulation — and damping keeps the camera drifting
+	// for a moment after a gesture ends.
+	stage.controls.update();
+
 	view.syncFrameState();
 	stage.renderer.render(stage.scene, stage.camera);
 }
