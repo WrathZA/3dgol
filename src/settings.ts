@@ -65,11 +65,18 @@ export const SETTING_BOUNDS = {
 	/**
 	 * The floor is 2 rather than 1: at 1 every Cell dies the Generation after
 	 * it is born, so nothing ever survives to traverse the Colour Gradient and
-	 * the structure degenerates into unconnected sparks. The ceiling is far
-	 * short of what an Age can hold — beyond it, Death by Old Age stops being
-	 * the thing that keeps the structure moving.
+	 * the structure degenerates into unconnected sparks.
+	 *
+	 * The ceiling is 200, and the default sits on it. That is a deliberate
+	 * choice with a real cost: nothing reaches the cap before Generation 200,
+	 * so the first Explosion lands around Generation 214 — roughly half a
+	 * minute at the default Speed — and until then the Run behaves like classic
+	 * Conway and decays. What it buys is the sparse, dramatic reading: Cells
+	 * spread right across the Colour Gradient instead of bunching young, long
+	 * pillars accumulate, and their Explosions are rare events rather than
+	 * constant churn. Lowering the slider trades that back for immediacy.
 	 */
-	maximumAge: { min: 2, max: 64, step: 1 },
+	maximumAge: { min: 2, max: 200, step: 1 },
 	/**
 	 * Reaches 1 exactly, where Cells span the full lattice spacing and touch,
 	 * so layers can be driven all the way to solid sheets. The floor stays
@@ -101,12 +108,15 @@ export type BoundedSetting = keyof typeof SETTING_BOUNDS;
  *
  * These are not the ceiling. What a device can actually afford is measured
  * rather than assumed, and that work has its own issue.
+ *
+ * Maximum Age starts at its own ceiling, which is the one default here chosen
+ * for character rather than for comfort — see `SETTING_BOUNDS.maximumAge`.
  */
 export const DEFAULT_SETTINGS: Settings = {
 	gridWidth: 48,
 	gridHeight: 48,
 	depthWindow: 60,
-	maximumAge: 24,
+	maximumAge: 200,
 	generationsPerSecond: 8,
 	cellSize: 0.55,
 };
