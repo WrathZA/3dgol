@@ -173,6 +173,32 @@ export function slotRange(
 	return { start: slot * count, count };
 }
 
+/**
+ * The Stack height Layers are placed against.
+ *
+ * A Layer's height is measured down from the top of the Stack, so this decides
+ * where the whole structure sits. Two cases pull in opposite directions:
+ *
+ * While the Stack is filling it is the held Layers that count, so the structure
+ * genuinely rises rather than hanging from the height it will eventually reach.
+ *
+ * While a narrowed Depth Window is travelling toward its new value, it is the
+ * drawn window that counts. The Stack still holds the Layers being given up —
+ * they are mid-dissolve, and they have to stay held or they could not dissolve
+ * at all — but measuring against them would leave the structure at its old
+ * height and then drop it the instant they were released.
+ *
+ * Pure and exported because it is unreachable by a test once it is a uniform,
+ * and getting it wrong is a jump of the entire structure rather than a subtle
+ * error.
+ */
+export function drawnLayerCount(
+	heldLayers: number,
+	drawnDepthWindow: number,
+): number {
+	return Math.min(heldLayers, drawnDepthWindow);
+}
+
 /** Ring slot a Generation is written into. */
 export function slotForGeneration(
 	generation: number,

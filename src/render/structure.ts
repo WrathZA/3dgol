@@ -2,6 +2,7 @@ import type { Mesh } from "three";
 
 import {
 	createStructureMesh,
+	drawnLayerCount,
 	type StructureMesh,
 	slotForGeneration,
 } from "@/render/instances";
@@ -78,6 +79,8 @@ export function createStructureView(
 
 	/** Ring modulus in force — the Stack's Depth Window as last laid out. */
 	let slotCount = simulation.stack.maxDepth;
+	/** The window being drawn, which the Viewer's changes travel toward. */
+	let drawnDepthWindow = simulation.stack.maxDepth;
 
 	const writeLayerAtDepth = (depth: number): void => {
 		const generation = simulation.stack.generationAt(depth);
@@ -105,7 +108,10 @@ export function createStructureView(
 		syncLatestLayer: writeNewest,
 
 		syncFrameState() {
-			structure.setFrameState(simulation.generation, simulation.stack.depth);
+			structure.setFrameState(
+				simulation.generation,
+				drawnLayerCount(simulation.stack.depth, drawnDepthWindow),
+			);
 			// Maximum Age is read every frame rather than pushed on change: the
 			// gradient then retargets the moment the Viewer moves the slider, with
 			// no separate notification to keep in step.
@@ -117,6 +123,7 @@ export function createStructureView(
 		},
 
 		setDepthWindow(depthWindow) {
+			drawnDepthWindow = depthWindow;
 			structure.setDepthWindow(depthWindow);
 		},
 
