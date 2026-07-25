@@ -20,6 +20,17 @@
 	width: 15rem;
 	padding: 1rem 1.1rem 1.15rem;
 
+	/*
+	 * The panel is fixed, so anything past the bottom of the viewport is simply
+	 * unreachable — there is no page to scroll. With six controls and a button it
+	 * is tall enough that a short window puts Restart off the end, so it is bounded
+	 * to the viewport and scrolls within itself instead. Contained overscroll keeps
+	 * that scroll from bubbling out and dragging the page around behind it.
+	 */
+	max-height: calc(100vh - 2.5rem);
+	overflow-y: auto;
+	overscroll-behavior: contain;
+
 	/* Glass rather than a solid slab, so the structure stays visible behind it
 	 * and the panel reads as part of the same space. */
 	background: rgb(13 17 26 / 72%);
@@ -80,6 +91,13 @@
 .panel__value--paused {
 	color: #ff6b86;
 	letter-spacing: 0.06em;
+}
+
+/* A staged value waiting for a Restart. Dimmed rather than alarming: nothing is
+ * wrong, the value simply has not landed yet. */
+.panel__value--pending {
+	color: rgb(154 140 255 / 62%);
+	font-style: italic;
 }
 
 /*
@@ -156,6 +174,65 @@
 
 .panel__slider:focus-visible::-moz-range-thumb {
 	box-shadow: 0 0 0 0.35rem rgb(126 249 232 / 32%);
+}
+
+/*
+ * Restart.
+ *
+ * The only control here that does something rather than sets something, so it is
+ * shaped differently from the sliders — a full-width surface with a border,
+ * reading as a button rather than as another value to adjust.
+ */
+.panel__restart {
+	display: block;
+	width: 100%;
+	margin-top: 1rem;
+	padding: 0.5rem 0.75rem;
+
+	font: inherit;
+	font-size: 0.76rem;
+	letter-spacing: 0.02em;
+	color: #cdd6e4;
+	text-align: center;
+
+	background: rgb(126 249 232 / 6%);
+	border: 1px solid rgb(126 249 232 / 22%);
+	border-radius: 0.35rem;
+	cursor: pointer;
+	transition:
+		background-color 120ms ease-out,
+		border-color 120ms ease-out;
+}
+
+.panel__restart:hover {
+	background: rgb(126 249 232 / 12%);
+	border-color: rgb(126 249 232 / 38%);
+}
+
+.panel__restart:active {
+	background: rgb(126 249 232 / 18%);
+}
+
+.panel__restart:focus-visible {
+	outline: none;
+	border-color: #7ef9e8;
+	box-shadow: 0 0 0 0.2rem rgb(126 249 232 / 22%);
+}
+
+/*
+ * A staged Grid change is waiting on this button, so the button says so and
+ * draws the eye. Without it a dimension change is invisible until the Viewer
+ * happens to restart, which reads as the slider having done nothing.
+ */
+.panel__restart--pending {
+	color: #d873f5;
+	background: rgb(216 115 245 / 10%);
+	border-color: rgb(216 115 245 / 42%);
+}
+
+.panel__restart--pending:hover {
+	background: rgb(216 115 245 / 18%);
+	border-color: rgb(216 115 245 / 60%);
 }
 
 .panel__note {

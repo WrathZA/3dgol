@@ -82,6 +82,27 @@ describe("Simulation", () => {
 		}
 	});
 
+	/**
+	 * Restart is the only influence the Viewer has over what a Run contains — they
+	 * choose *when* a Seed is drawn, never what it holds. That is only true if each
+	 * Restart draws a fresh one: a Restart that reproduced the same Seed would make
+	 * the control pointless without looking broken.
+	 */
+	it("draws a different Seed on each Restart", () => {
+		const simulation = new Simulation({
+			width: 16,
+			height: 16,
+			maximumAge: 10,
+			random: seededRandom(7),
+		});
+
+		const first = Uint16Array.from(simulation.grid.ages);
+		simulation.restart();
+		const second = Uint16Array.from(simulation.grid.ages);
+
+		expect(second).not.toEqual(first);
+	});
+
 	it("produces the same Run from the same random source", () => {
 		const first = new Simulation({
 			width: 12,

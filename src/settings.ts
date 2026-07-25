@@ -27,18 +27,27 @@ export interface SettingBound {
 }
 
 /**
- * Bounds for the settings the Viewer changes while a Run is in progress.
+ * Bounds for every setting the Viewer can move.
  *
  * These are the interface, not suggestions: whatever the panel permits is what
  * the slowest supported device has to survive, so the limits *are* the
- * performance strategy. The Depth Window ceiling in particular sets how large
- * the instance ring is allocated, and Grid dimensions multiplied by Depth
- * Window is the number that gets away from you. Establishing that ceiling by
- * measurement on real low-end hardware is its own issue; until then these are
- * conservative rather than measured.
+ * performance strategy.
  *
- * Grid dimensions are absent because they are not live controls — they are
- * staged and applied on Restart, and arrive with that issue.
+ * **The number that matters is the product, not any single bound.** Grid width ×
+ * Grid height × Depth Window is how many Cell instances exist, and every one of
+ * them is a cube transformed each frame whether its Cell is alive or dead —
+ * fixed ring slots are what make the indexing work, so dead Cells are collapsed
+ * rather than skipped. At the ceilings below that product is 96 × 96 × 120 =
+ * 1,105,920 instances, about thirteen million triangles a frame, and roughly
+ * four times the largest configuration ever shipped. Nothing here has been
+ * measured on real low-end hardware — that is its own issue, and this table is
+ * deliberately the single place it writes the measured limit for both halves of
+ * the product.
+ *
+ * Grid dimensions are bounded here alongside the live settings even though they
+ * behave differently: they are *staged*, read only when a Run starts, because a
+ * Layer computed at one Grid size cannot coherently stack on Layers computed at
+ * another. Being bounded and being applied immediately are separate questions.
  */
 export const SETTING_BOUNDS = {
 	/**
@@ -67,10 +76,20 @@ export const SETTING_BOUNDS = {
 	 * clear of zero — a Cell has to remain visible to be seen through.
 	 */
 	cellSize: { min: 0.15, max: 1, step: 0.01 },
+	/**
+	 * Staged, not live — applied when a Run starts.
+	 *
+	 * The floor keeps the Grid large enough for Life to have somewhere to happen;
+	 * below about sixteen a Bounded Edge destroys almost everything before it
+	 * moves. The ceiling is where the instance product stops being defensible: the
+	 * cost is area, so 96 is not twice 48 but four times it.
+	 */
+	gridWidth: { min: 16, max: 96, step: 1 },
+	gridHeight: { min: 16, max: 96, step: 1 },
 } as const satisfies Record<string, SettingBound>;
 
-/** Settings the Viewer changes without disturbing the Run in progress. */
-export type LiveSetting = keyof typeof SETTING_BOUNDS;
+/** Any setting with a declared range. */
+export type BoundedSetting = keyof typeof SETTING_BOUNDS;
 
 /**
  * Starting values, chosen to look right rather than to stress anything.
@@ -119,10 +138,16 @@ export function clampSetting(value: number, bound: SettingBound): number {
 	return Number(clamped.toFixed(decimalPlaces(step)));
 }
 
-/** Brings every live setting onto its range. Grid dimensions are left alone. */
-export function clampLiveSettings(settings: Settings): Settings {
+/**
+ * Brings every setting onto its range, returning a copy.
+ *
+ * A copy rather than a mutation because `DEFAULT_SETTINGS` is exported and the
+ * panel writes into whatever object it is handed — clamping in place would make
+ * the module's own defaults drift as the Viewer moved a slider.
+ */
+export function clampSettings(settings: Settings): Settings {
 	const clamped = { ...settings };
-	for (const key of Object.keys(SETTING_BOUNDS) as LiveSetting[]) {
+	for (const key of Object.keys(SETTING_BOUNDS) as BoundedSetting[]) {
 		clamped[key] = clampSetting(settings[key], SETTING_BOUNDS[key]);
 	}
 	return clamped;
