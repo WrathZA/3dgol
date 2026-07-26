@@ -222,8 +222,15 @@ What the product exposes externally:
 **The public URL** — a single route, `/`, serving the static bundle from Cloudflare Workers Static
 Assets. No other paths exist.
 
-**The on-screen control surface** — the sole means of interacting with the running product. Each control
-maps to a PRD behaviour:
+**One query parameter, `?pattern=<id>`** — the product's only externally-supplied input, added in #50. It
+names one of the starting patterns the product ships and is read once at boot; anything unrecognised is
+ignored and the run seeds randomly. Nothing else is accepted from the URL, and no value in it reaches the
+DOM, a request, or a property key. This is worth stating in the interface section rather than only in the
+PRD, because every security assumption in this repository rested on the product having no external input
+at all, and that is no longer true.
+
+**The on-screen control surface** — the means of interacting with the running product, and the only means
+of changing anything once it is loaded. Each control maps to a PRD behaviour:
 
 | Control | PRD behaviour | Effect |
 |---------|---------------|--------|

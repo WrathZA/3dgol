@@ -311,8 +311,9 @@ The initial state a run begins from — either a random scatter or a named patte
 | `density` | Proportion of grid positions alive at generation 0, when the seed is random |
 | `pattern` | The named arrangement generation 0 holds instead, when one was chosen |
 
-A fresh page load always seeds randomly at a fixed default density, and so does the Random control.
-Choosing a pattern seeds from that pattern instead. Either way seeding happens as part of a restart (B8).
+A plain page load seeds randomly at a fixed default density, and so does the Random control. Choosing a
+pattern seeds from that pattern instead, and so does opening a link that carries one (B8). Either way
+seeding happens as part of a restart (B8).
 
 The Viewer chooses *when* a new seed is generated and *which of a fixed list* it comes from — never what a
 pattern contains. Patterns cannot be composed, edited, or drawn cell by cell (see Out of Scope), which is
