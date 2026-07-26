@@ -82,8 +82,13 @@ deliberately no third state in which a cell dies quietly of age — that configu
 so the cap and the burst are one control rather than two.
 
 The default is on, because off is the state the explosion exists to prevent: within a few hundred
-generations the structure stops changing, and a first-time viewer must not land there without having asked
-for it.
+generations the structure stops changing, and a first-time viewer must not land there on arrival.
+
+There is exactly one way to reach that state without having asked for it directly, and it is deliberate:
+choosing a pattern switches the explosion off (B8), and pressing Random afterwards does not switch it back
+on. A viewer who does both gets a random seed with the explosion off. The reasoning is in B8; what matters
+here is that the guarantee is about the opening state rather than about every state reachable afterwards,
+because the switch is visible and one movement undoes it.
 
 A is the same number as the top of the colour gradient (see Cell), so a cell's colour is a countdown to its
 own detonation: it passes through the full palette as it ages, and blows up as it reaches the end. The
@@ -126,7 +131,8 @@ Applied immediately, without disturbing the run in progress:
 - **Maximum age (A)** — how long a cell lives before it detonates, which is also the span of the colour
   gradient.
 - **Explosion** — whether reaching A detonates at all. Off, nothing happens at A and the rule is plain
-  Conway; the age still governs colour. Defaults on.
+  Conway; the age still governs colour. Defaults on at page load, and is switched off by choosing a
+  pattern (B8) — the only setting anything other than the Viewer moves.
 - **Cell size** — how large each cell is drawn, and therefore whether layers read as porous scatters or
   solid sheets.
 
