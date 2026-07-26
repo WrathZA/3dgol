@@ -683,6 +683,16 @@
 	}
 
 	/*
+	 * The mark is drawn small and hit large — the same split as the sliders.
+	 * Shrinking the drawing to buy vertical space took the link's hit area down
+	 * with it, and this is a link a thumb has to land on, not a decoration.
+	 */
+	.panel__signature {
+		align-items: center;
+		min-height: 2.75rem;
+	}
+
+	/*
 	 * Separation, not just size — but less of it than the first attempt used.
 	 * Adjacent sliders are already parted by a label row carrying the setting's
 	 * name and value, so the gap here is what keeps two *hit* areas from touching,
