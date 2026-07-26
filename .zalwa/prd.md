@@ -308,6 +308,8 @@ the line that keeps a pattern picker from being an authoring tool.
 
 ### Pattern
 
+- #49 feat: the pattern list grows, and each pattern carries its own explosion rule
+
 A named arrangement of live cells the product ships, offered as a starting point.
 
 | Field | Meaning |
@@ -399,6 +401,8 @@ pulled back to its final colour rather than flaring.
 
 ### B6 — Set cell size
 
+- #51 feat: cells are always drawn at full size
+
 The Viewer increases cell size → cells grow until neighbouring live cells touch and layers read as solid
 sheets. Decreases it → gaps open between cells, layers read as scattered points, and the interior of the
 structure becomes visible through the gaps. The camera does not move.
@@ -411,6 +415,8 @@ The Viewer changes width or height → the change is accepted but does not alter
 interface indicates the new dimensions apply on restart. On restart (B8), the new run uses them.
 
 ### B8 — Start a fresh run
+
+- #50 feat: a chosen pattern can be shared by URL
 
 The Viewer presses **Random** → the stack clears, the generation counter returns to 0, the grid reseeds
 randomly, and layers begin accumulating again from an empty space using the currently configured
