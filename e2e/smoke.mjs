@@ -108,6 +108,7 @@ function readLayout() {
 		// so the whole row is what a finger lands on and the track alone would
 		// measure 18px and fail a control that is comfortably hittable.
 		...document.querySelectorAll(".panel__control--switch"),
+		...document.querySelectorAll(".panel__pattern"),
 		...document.querySelectorAll(".panel__restart"),
 		...document.querySelectorAll(".panel__toggle"),
 		...document.querySelectorAll(".panel__signature"),

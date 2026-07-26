@@ -371,10 +371,67 @@
  * shaped differently from the sliders — a full-width surface with a border,
  * reading as a button rather than as another value to adjust.
  */
+/*
+ * The two ways to start a Run, sharing one row.
+ *
+ * The Pattern chooser takes the space it needs for its longest entry and Random
+ * takes the rest, rather than a even split — a Pattern's name has to be readable
+ * to be chosen, while "Random" is one short word that stays legible in whatever
+ * is left. The row carries the margin the button used to carry alone.
+ */
+.panel__start {
+	display: flex;
+	align-items: stretch;
+	gap: 0.5rem;
+	margin-top: 1rem;
+}
+
+.panel__pattern {
+	flex: 1 1 auto;
+	/* Without this a long Pattern name sets the row's width and pushes Random off
+	 * the end of a narrow sheet — flex items refuse to shrink below their content
+	 * by default. */
+	min-width: 0;
+	padding: 0.5rem 0.5rem;
+
+	font: inherit;
+	font-size: 0.76rem;
+	letter-spacing: 0.02em;
+	color: #cdd6e4;
+
+	background: rgb(205 214 228 / 6%);
+	border: 1px solid rgb(205 214 228 / 18%);
+	border-radius: 0.35rem;
+	cursor: pointer;
+	transition:
+		background-color 120ms ease-out,
+		border-color 120ms ease-out;
+}
+
+.panel__pattern:hover {
+	background: rgb(205 214 228 / 12%);
+	border-color: rgb(205 214 228 / 32%);
+}
+
+.panel__pattern:focus-visible {
+	outline: none;
+	border-color: #7ef9e8;
+	box-shadow: 0 0 0 0.2rem rgb(126 249 232 / 22%);
+}
+
+/* The dropdown list itself is drawn by the platform, which does not inherit the
+ * panel's colours — so the options are given a background that is not white on
+ * a dark page. */
+.panel__pattern option {
+	color: #cdd6e4;
+	background: #11151c;
+}
+
 .panel__restart {
 	display: block;
-	width: 100%;
-	margin-top: 1rem;
+	/* Sized to its own text rather than the row, so the Pattern chooser gets the
+	 * width — the button's label is one short word and does not need more. */
+	flex: 0 0 auto;
 	padding: 0.5rem 0.75rem;
 
 	font: inherit;
@@ -707,7 +764,8 @@
 		margin-bottom: 0.2rem;
 	}
 
-	.panel__restart {
+	/* The row carries the margin now, not the button inside it. */
+	.panel__start {
 		margin-top: 0.6rem;
 	}
 
@@ -798,6 +856,13 @@
 	}
 
 	.panel__restart {
+		min-height: 2.75rem;
+	}
+
+	/* Matched to the button beside it, so the row reads as one control surface
+	 * rather than two of different heights — and both are tapped once, so both
+	 * take the full target. */
+	.panel__pattern {
 		min-height: 2.75rem;
 	}
 

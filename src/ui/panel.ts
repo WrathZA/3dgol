@@ -224,6 +224,7 @@ export function createControlPanel(
 	const runningGrid =
 		options.runningGrid ??
 		(() => ({ width: settings.gridWidth, height: settings.gridHeight }));
+	const patterns = options.patterns ?? [];
 
 	panelsBuilt += 1;
 	const panelId = `structure-controls-${panelsBuilt}`;
@@ -448,6 +449,17 @@ export function createControlPanel(
 		element.append(wrapper);
 	}
 
+	/*
+	 * The two ways to start a fresh Run, on one row.
+	 *
+	 * Together rather than stacked because they are the same act with different
+	 * contents — both clear the Stack, reset the counter, and apply staged Grid
+	 * dimensions; only Generation 0 differs. Sharing a row says that, and it is
+	 * also what lets a seventh control into a sheet a portrait phone shows whole.
+	 */
+	const startRow = document.createElement("div");
+	startRow.className = "panel__start";
+
 	const restartButton = document.createElement("button");
 	restartButton.type = "button";
 	restartButton.className = "panel__restart";
@@ -456,7 +468,53 @@ export function createControlPanel(
 		// replaced, so a Restart cannot land part-way through a frame.
 		restart.requested = true;
 	});
-	element.append(restartButton);
+
+	if (patterns.length > 0) {
+		const chooser = document.createElement("select");
+		chooser.className = "panel__pattern";
+		// The drawing is the whole control, so the accessible name has to come from
+		// here — there is no visible label to wrap, the row being shared with a
+		// button that has its own.
+		chooser.setAttribute("aria-label", "Start from a pattern");
+
+		/*
+		 * A placeholder the control returns to after every choice.
+		 *
+		 * Load-bearing rather than decorative. A `<select>` fires no `change` event
+		 * when the already-selected option is chosen again, so without something to
+		 * return to, picking the same Pattern twice would silently do nothing — the
+		 * Viewer presses it and the product ignores them. Resetting the value in the
+		 * handler means the next choice is always a change, whichever it is.
+		 */
+		const placeholder = document.createElement("option");
+		placeholder.value = "";
+		placeholder.textContent = "Pattern…";
+		chooser.append(placeholder);
+
+		patterns.forEach((pattern, index) => {
+			const option = document.createElement("option");
+			option.value = String(index);
+			option.textContent = pattern.name;
+			chooser.append(option);
+		});
+
+		chooser.addEventListener("change", () => {
+			const chosen = patterns[Number(chooser.value)];
+			// Back to the placeholder before anything else, so the control is ready to
+			// fire again even if the Restart below is somehow not taken.
+			chooser.value = "";
+			if (chosen === undefined) {
+				return;
+			}
+			restart.pattern = chosen;
+			restart.requested = true;
+		});
+
+		startRow.append(chooser);
+	}
+
+	startRow.append(restartButton);
+	element.append(startRow);
 
 	/**
 	 * Says on the button itself what a Restart will now do.
@@ -467,9 +525,11 @@ export function createControlPanel(
 	function syncPending(): void {
 		const pending = restartPending();
 		restartButton.classList.toggle("panel__restart--pending", pending);
+		// "Random" rather than "Restart" now that it is one of two ways to start a
+		// Run — the other names a Pattern, so this one names what it seeds with.
 		restartButton.textContent = pending
-			? `Restart at ${settings.gridWidth} × ${settings.gridHeight}`
-			: "Restart";
+			? `Random at ${settings.gridWidth} × ${settings.gridHeight}`
+			: "Random";
 	}
 
 	syncPending();
