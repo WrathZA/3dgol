@@ -399,6 +399,8 @@ interface indicates the new dimensions apply on restart. On restart (B8), the ne
 
 ### B8 — Start a fresh run
 
+- #46 feat: choosing a pattern switches the explosion off
+
 The Viewer presses **Random** → the stack clears, the generation counter returns to 0, the grid reseeds
 randomly, and layers begin accumulating again from an empty space using the currently configured
 dimensions.
