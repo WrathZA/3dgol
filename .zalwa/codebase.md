@@ -11,15 +11,19 @@ Issue #3 scaffolded the project and proved the deployment path. #4 built the sim
 history window, #6 drew it, #8 gave it colour, fade, and cubic edge-drawn cells, #7 made it something you
 can walk around, #9 gave it a control panel for Speed, Depth Window, Maximum Age, and Cell Size, #10
 added staged Grid dimensions and Restart, #26 made Death by Old Age detonate, #32 signed the panel, #11
-laid the whole thing out for a phone, and #37 made that layout survive a real one.
+laid the whole thing out for a phone, #37 made that layout survive a real one, and #29 raised the starting
+Speed to 10 Generations per second.
 
-Not yet built: the drawing budget (#12) and link previews (#13). The instance ceiling the panel permits has
-never been measured — deliberate, and owned by #12.
+Not yet built: link previews (#13). The instance ceiling the panel permits has never been measured —
+deliberate, and owned by #12, which is now `priority:deferred` and reachable only via `/zalwa-ride 12`.
 
-Queued behind those: the Colour Gradient reads near-monochrome at the A=200 default (#28), Speed's default
-moves to 15 (#29), the Explosion gains an off switch (#30), the Grid ceiling rises to 128 (#31, blocked
-on #12), the author's mark is under the contrast threshold at rest (#35), and `pnpm smoke` writes a
-screenshot to the repo root that is not gitignored (#34).
+Queued: the Explosion gains an off switch (#30), the author's mark is under the contrast threshold at rest
+(#35), and `pnpm smoke` writes a screenshot to the repo root that is not gitignored (#34).
+
+Deferred by decision rather than by ordering: the drawing budget (#12) and the near-monochrome Colour
+Gradient at the A=200 default (#28) both carry `priority:deferred`, so neither surfaces in auto-pick. #31
+(Grid ceiling to 128) is blocked by #12 and is therefore blocked behind a deferred issue — reviving it means
+reviving #12 first.
 
 **The panel has no automated coverage at all.** `vitest` runs in `environment: "node"` with no DOM, so
 nothing in `src/ui/` is reachable by a unit test — the phone layout is verified only by a local
