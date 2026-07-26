@@ -279,15 +279,14 @@
 .panel__signature-mark {
 	display: block;
 	height: 3rem;
-	/* The viewBox is 32 × 40, so the width follows from the height. Fixing only
+	/* The viewBox is 27.4 × 40, so the width follows from the height. Fixing only
 	 * one dimension keeps the drawing from stretching if the box ever changes. */
 	width: auto;
 
-	fill: none;
-	stroke: currentColor;
-	stroke-width: 1.6;
-	stroke-linecap: round;
-	stroke-linejoin: round;
+	/* Filled, not stroked. Hairlines matched the panel's rules but dissolved into
+	 * an unreadable glyph at 3rem; a silhouette is what survives being small. */
+	fill: currentColor;
+	stroke: none;
 }
 
 /*
