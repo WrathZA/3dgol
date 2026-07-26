@@ -15,11 +15,12 @@ laid the whole thing out for a phone, #37 made that layout survive a real one, #
 Speed to 10 Generations per second, #30 made the detonation a reset rather than a death and gave the
 Viewer a switch for it, #42 added a starting-Pattern picker with Gosper's glider gun, #46 made choosing a
 Pattern switch the Explosion off so the gun is not destroyed by it, #49 grew that list to seven, #50
-put the chosen Pattern in the URL so a run can be shared, and #51 removed the Cell Size control so Cells
-are always drawn at the full lattice spacing.
+put the chosen Pattern in the URL so a run can be shared, #51 removed the Cell Size control so Cells
+are always drawn at the full lattice spacing, and #13 made a shared link unfurl as a card.
 
-Not yet built: link previews (#13). The instance ceiling the panel permits has never been measured —
-deliberate, and owned by #12, which is now `priority:deferred` and reachable only via `/zalwa-ride 12`.
+**Every behaviour the PRD names is now built.** The instance ceiling the panel permits has never been
+measured — deliberate, and owned by #12, which is now `priority:deferred` and reachable only via
+`/zalwa-ride 12`.
 
 Queued: the author's mark is under the contrast threshold at rest (#35), `pnpm smoke` writes a screenshot to
 the repo root that is not gitignored (#34) — hit twice more during #42 — and the PRD's tuned-defaults list
@@ -70,7 +71,10 @@ Everything under "Planned layout" below that is not listed above is still unbuil
 ## Actual files
 
 ```
-index.html            Full-viewport canvas (#viewport), meta tags, minimal inline CSS
+index.html            Full-viewport canvas (#viewport), share-card metadata, minimal inline CSS
+public/
+  og-image.png        The link preview — a 1200 × 630 frame of a real run, captured, not mocked up
+  robots.txt          Crawling allowed explicitly, because a missing file returns the 404 page
 src/
   main.ts             Composition root — the Run object, rAF loop, settings diff, Restart
   settings.ts         Starting values, bounds, clamping, and the rule a Pattern imposes
@@ -92,6 +96,7 @@ src/
     signature.ts      The author's mark (original SVG) and GitHub's octocat — the two links out
 e2e/
   smoke.mjs           Headless render + screenshot; `--phone` checks the sheet in both orientations
+  og-capture.mjs      `pnpm og-image` — recaptures public/og-image.png when the visuals change
 tests/
   sim/
     helpers.ts        Pattern-to-Grid fixtures and comparison helpers (not a test file)
@@ -785,6 +790,12 @@ Exposes: `createSignatureMark`.
   not wrong — one fixed curve cannot serve both A=4 and A=200. This works against B11 at the one setting
   every first-time visitor sees, and is the clearest open cost against principle 2. Making the curve adapt
   to A is unmeasured visual tuning with its own issue.
+- **The share card ages silently, and nothing checks it.** `public/og-image.png` is a captured frame, so
+  any change to colour, fade, or geometry makes it a picture of a product that no longer exists — and the
+  only place that shows is somebody else's Slack. `pnpm og-image` recaptures it in one command, but it is
+  a command someone has to remember rather than a check that fires. The same gap covers the tags: `vitest`
+  runs in `environment: "node"` with no DOM, so a change that drops `og:image` or renames the file ships
+  without a failing test. Recapture after anything visual; #25's harness is where a tag check would live.
 - **Smoothness has never been observed on a real GPU.** Every render check so far ran against a software
   rasteriser, whose frame timings mean nothing. The design keeps per-frame CPU work constant, but that is
   reasoning, not evidence.
