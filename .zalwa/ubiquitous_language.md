@@ -42,12 +42,7 @@ generation, or none, while paused.
 |------|-----------|-----------------|
 | **Viewer** | Anyone who loads the public URL. The only actor; no accounts, no roles, no identity. | user, player, visitor, admin |
 | **Speed** | How many generations the simulation advances per unit of time, including zero, which is a pause. | rate, fps, tempo |
-| **Cell Size** | How large each cell is drawn, controlling whether layers read as porous scatters or solid sheets. Independent of camera distance. | scale, zoom, resolution |
 | **Colour Gradient** | The palette mapped across a cell's lifetime, from birth at one end to the Maximum Age at the other. | palette, heatmap, colour ramp |
-
-Note the distinction between **Cell Size** and camera zoom: zoom changes how close the viewer is to the
-structure, cell size changes what the structure is made of. They are not interchangeable, and conflating
-them in conversation or in code produces exactly the wrong control.
 
 ## Relationships
 
