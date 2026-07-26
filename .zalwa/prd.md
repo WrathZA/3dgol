@@ -497,8 +497,9 @@ The following are deliberately not built in v1.
    marked "deferred rather than rejected" and has since been built — but the *authoring* half stays out,
    and that is what keeps the Actors list at one. Nobody gains the ability to decide what anyone else sees.
 
-4. **Drawing or editing cells.** The Viewer cannot place, erase, or paint cells. The only way to influence
-   the starting state is to restart and get a different random seed.
+4. **Drawing or editing cells.** The Viewer cannot place, erase, or paint cells. The starting state can be
+   influenced only by choosing which run to start — a fresh random seed, or one of the patterns the product
+   ships — never by composing or altering what a pattern contains.
 
 5. **Sharing and persistence.** No permalinks that encode a configuration, no saved runs, no accounts, no
    server-side state of any kind. Settings do not survive a page reload.
