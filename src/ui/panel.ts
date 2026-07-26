@@ -356,9 +356,32 @@ export function createControlPanel(
 
 	syncPending();
 
+	/*
+	 * How to move the camera — in the terms of the input the Viewer actually has.
+	 *
+	 * The gestures genuinely differ: a mouse zooms on the wheel and pans on the
+	 * right button, neither of which a phone has, and a phone pans and zooms with
+	 * the same two-finger movement. One line cannot describe both, and the desktop
+	 * wording on a phone is worse than no line at all — it names two controls that
+	 * do not exist and leaves the ones that do unmentioned.
+	 *
+	 * Both are written, and the stylesheet shows one. Choosing here would mean
+	 * reading pointer type in JavaScript and re-reading it when a tablet's keyboard
+	 * is attached or removed; the media query does that on its own.
+	 */
 	const note = document.createElement("p");
 	note.className = "panel__note";
-	note.textContent = "Drag to orbit · scroll to zoom · right-drag to pan";
+
+	const pointerHint = document.createElement("span");
+	pointerHint.className = "panel__note-hint panel__note-hint--fine";
+	pointerHint.textContent =
+		"Drag to orbit · scroll to zoom · right-drag to pan";
+
+	const touchHint = document.createElement("span");
+	touchHint.className = "panel__note-hint panel__note-hint--coarse";
+	touchHint.textContent = "Drag to orbit · pinch to zoom · two fingers to pan";
+
+	note.append(pointerHint, touchHint);
 	element.append(note);
 
 	// The author's mark, and the only way out of the product.

@@ -277,6 +277,26 @@
 }
 
 /*
+ * One hint per input. Both are in the markup; exactly one is displayed.
+ *
+ * `display: none` rather than a visual hide, so a screen reader is not given two
+ * contradictory sets of instructions to read out in sequence.
+ */
+.panel__note-hint--coarse {
+	display: none;
+}
+
+@media (pointer: coarse) {
+	.panel__note-hint--fine {
+		display: none;
+	}
+
+	.panel__note-hint--coarse {
+		display: inline;
+	}
+}
+
+/*
  * The author's mark.
  *
  * A block rather than an inline link so the hit area is the full width of the
