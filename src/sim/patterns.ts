@@ -31,15 +31,18 @@ export interface Pattern {
  * of parallel diagonal streaks — a shape that is genuinely invisible in a flat
  * renderer and that a random Seed only ever produces by accident.
  *
- * It depends on two stationary reflector blocks whose Cells never change state,
- * which is why it needs the Explosion switched off to run indefinitely: with the
- * Explosion on those blocks reach Maximum Age and detonate, and the gun
- * dismantles itself. Both readings are worth seeing and neither is wrong — see
- * #30, which made that a choice rather than the only outcome.
+ * It depends on two reflector blocks, and those are **catalysts rather than
+ * still lifes** — the shuttle disturbs each block's inner face every cycle and
+ * the block reforms, so only the *outer* column of each is continuously alive.
+ * Those four Cells are the ones that age without interruption, so those are the
+ * ones that reach Maximum Age: with the Explosion on they detonate and the gun
+ * dismantles itself, which is why this Pattern waited on #30. Both readings are
+ * worth seeing and neither is wrong — #30 made it a choice rather than the only
+ * outcome.
  *
- * 36 × 9. The two blocks at the left and right ends are the reflectors; the
- * machinery between them is the pair of queen-bee shuttles that produce a glider
- * on every collision.
+ * 36 × 9, 36 live Cells, period 30. The two blocks at the left and right ends
+ * are the reflectors; the machinery between them is the pair of queen-bee
+ * shuttles that produce a glider on every collision.
  */
 export const GOSPER_GLIDER_GUN: Pattern = {
 	name: "Gosper's glider gun",
