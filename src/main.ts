@@ -6,6 +6,7 @@ import {
 	DEFAULT_SETTINGS,
 	SETTING_BOUNDS,
 } from "@/settings";
+import { patternFromQuery, urlWithPattern } from "@/share";
 import { advanceClock, retimeAccumulator } from "@/sim/clock";
 import { PATTERNS, type Pattern } from "@/sim/patterns";
 import { Simulation } from "@/sim/simulation";
@@ -159,9 +160,34 @@ function startRun(previous: Run | undefined, pattern: Pattern | null): Run {
 	};
 }
 
-// A fresh page load always seeds randomly. The opening state is nobody's choice —
-// which is what keeps the Actors list at one even now that Patterns exist.
-let run = startRun(undefined, null);
+/*
+ * What this page load opens on.
+ *
+ * A plain visit still seeds randomly — no Pattern in the URL means nobody chose
+ * what this Viewer sees first. A shared link is the one case where somebody did:
+ * the sender picked from the fixed list the product ships, and the recipient
+ * opens on that. They can press Random at any point and be exactly where a plain
+ * visitor started.
+ *
+ * `applyStartRule` runs before the Run is built, so a shared Pattern arrives
+ * under the same Explosion rule a Pattern chosen from the dropdown gets. One
+ * path, not two — a Pattern that behaved differently depending on how it was
+ * chosen would be a bug nobody would think to look for.
+ */
+const sharedPattern = patternFromQuery(window.location.search, PATTERNS);
+applyStartRule(settings, sharedPattern);
+
+// The URL is made to agree with what actually started, which matters most in the
+// case it looks least necessary: a link naming a Pattern this build does not
+// have degrades to a random Run, and without this the address bar would keep
+// claiming that Pattern. A Viewer copying it would pass the broken link on.
+window.history.replaceState(
+	null,
+	"",
+	urlWithPattern(window.location.href, sharedPattern),
+);
+
+let run = startRun(undefined, sharedPattern);
 
 /**
  * Whether the Viewer has asked for a Restart since the last frame.
@@ -288,6 +314,17 @@ function frame(now: number): void {
 		applyStartRule(settings, pattern);
 
 		restartRun(pattern);
+
+		// The address bar now says what the Run is doing — the Pattern's id, or
+		// nothing at all after Random. `replaceState` rather than `pushState`: the
+		// back button should leave the product rather than walk a history of
+		// selections, which is what B13 already assumes when it argues the author
+		// link must open in a new tab.
+		window.history.replaceState(
+			null,
+			"",
+			urlWithPattern(window.location.href, pattern),
+		);
 	}
 
 	if (settings.generationsPerSecond !== run.appliedSpeed) {

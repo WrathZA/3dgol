@@ -164,8 +164,13 @@ held to the same line — no trace, no filter, no background-removed reproductio
 would look.
 
 It opens in a new tab, and that is not a detail. History is a window rather than an archive: navigating away
-discards the run, and a Viewer returning by the back button gets a new random seed rather than the structure
-they were looking at. A link that quietly destroys what the Viewer came to see would be a defect.
+discards the run, and a Viewer returning by the back button gets a freshly seeded structure rather than the
+one they were looking at. A link that quietly destroys what the Viewer came to see would be a defect.
+
+Carrying the pattern in the URL (B8) softens that without removing it. Coming back now restores which
+pattern was running, so a Viewer who left the gun returns to the gun — but they return to it at generation
+0, with every layer they had accumulated gone. The structure is what they came to see, and the structure is
+still destroyed. The new tab stays.
 
 This is a signature, not a role. Nobody gains an ability the Viewer does not already have, and the Actors
 section below remains a list of one.
@@ -188,15 +193,22 @@ Responsibilities:
 - Starts a fresh run, either from a new random seed or from a pattern chosen from a fixed list.
 
 **This list of one is intentional, not an omission.** There is no author, curator, admin, or publisher role
-in v1. The opening state is a randomly seeded grid, not a hand-picked arrangement, so nobody occupies the
-role of "person who chose what you see first" — randomness does. That still holds now that patterns exist,
-because a fresh page load ignores them: a visitor arriving for the first time sees a random seed, and only
-their own subsequent choice changes that.
+in v1.
 
-The pattern list narrows the claim rather than breaking it. What would introduce an authoring role is
-*composing* a pattern — deciding what someone else's run contains — and that stays out of scope, along with
-drawing cells. Picking from a fixed list the product ships is a choice about what you yourself watch next,
-which every other control already is. The list is content, not a role.
+The original argument for that was simple: the opening state is randomly seeded, so nobody occupies the role
+of "person who chose what you see first" — randomness does. **Shareable pattern links (B8) make that
+argument false**, and it is replaced rather than patched. A visitor opening a link someone sent them is
+seeing what the sender chose. Somebody does occupy that role.
+
+The list stays at one because of what the sender can and cannot do, not because nobody chooses. A sender
+picks one entry from a fixed list the product ships, identical for everyone, which they can neither add to
+nor alter. They are pointing at content, the way anyone linking to a page points at a page. What would make
+them an author is *composing* a pattern — deciding what someone else's run contains rather than which of the
+product's own arrangements it starts from — and that stays out of scope along with drawing cells.
+
+The distinction is worth keeping sharp, because it is the line the actor list rests on: **choosing among
+what exists is not authorship; creating what others see is.** Every control in the product is the first.
+None is the second, and none may become the second without this section being revisited.
 
 ## Domain Objects
 
@@ -381,6 +393,11 @@ The Viewer loads the public URL. The grid seeds randomly, the simulation begins 
 begin accumulating upward. No configuration, dismissal, or interaction is required first — the structure
 is already building when the page settles.
 
+A link carrying a pattern (B8) opens on that pattern instead of a random seed. Everything else is identical
+— nothing to dismiss, nothing to configure, already building. A link carrying anything the product does not
+recognise opens exactly as a plain visit does, because a shared link that failed to open would waste the one
+moment it exists for.
+
 ### B2 — Control speed
 
 - #29 feat: the run starts at 10 generations per second
@@ -434,8 +451,6 @@ interface indicates the new dimensions apply on restart. On restart (B8), the ne
 
 ### B8 — Start a fresh run
 
-- #50 feat: a chosen pattern can be shared by URL
-
 The Viewer presses **Random** → the stack clears, the generation counter returns to 0, the grid reseeds
 randomly, and layers begin accumulating again from an empty space using the currently configured
 dimensions. Random changes nothing else — in particular it does not touch the explosion switch.
@@ -467,6 +482,24 @@ one movement of a switch they can see is off.
 Both paths are restarts in every sense that matters: staged grid dimensions apply, the stack empties, and
 the counter returns to 0. Only the contents of generation 0 differ. The behaviour is named for starting a
 run rather than for restarting one, because a pattern selection is not a repeat of anything.
+
+**The chosen pattern appears in the URL, so a run can be shared.** Choosing a pattern puts its identifier in
+the address bar; pressing Random takes it out again, so the URL never claims a pattern the run is not using.
+Opening a URL that carries a pattern starts on that pattern — with its explosion rule applied exactly as a
+dropdown choice would, because a pattern that behaved differently depending on how it was chosen would be a
+defect nobody would think to look for.
+
+Only the pattern travels. Speed, depth, maximum age, the explosion and grid dimensions are not in the URL,
+so a shared link says "watch this pattern" rather than "watch this pattern exactly as I had everything set".
+
+**A URL the product does not recognise opens a random run rather than failing.** An unknown identifier, an
+empty one, or a mangled one is treated as no pattern at all. This is the only place the product accepts
+input from outside itself, and a shared link that renders an error has destroyed the one moment it existed
+for — the recipient loses the sender's pattern and nothing else.
+
+Changing the URL does not add a history entry. The back button leaves the product rather than stepping
+through previous selections, which is what B13 assumes when it argues the author's link must open in a new
+tab.
 
 ### B9 — Navigate the structure
 
@@ -566,8 +599,10 @@ The following are deliberately not built in v1.
    influenced only by choosing which run to start — a fresh random seed, or one of the patterns the product
    ships — never by composing or altering what a pattern contains.
 
-5. **Sharing and persistence.** No permalinks that encode a configuration, no saved runs, no accounts, no
-   server-side state of any kind. Settings do not survive a page reload.
+5. **Sharing a configuration, and persistence.** A link may carry the chosen pattern and nothing else. No
+   permalink encodes speed, depth, maximum age, the explosion, or grid dimensions; no saved runs, no
+   accounts, no server-side state of any kind. Settings other than the pattern do not survive a page reload,
+   and the pattern survives only because it is in the URL the viewer was given — nothing is stored.
 
 6. **Export.** No screenshot, video, or GIF capture from within the product.
 
