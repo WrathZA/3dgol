@@ -8,6 +8,18 @@ import {
 	type Settings,
 } from "@/settings";
 
+describe("DEFAULT_SETTINGS", () => {
+	/**
+	 * The Speed default is judged by eye rather than derived, so `clampSettings`
+	 * leaving it untouched only proves it sits on the range and the step — it
+	 * would not notice the value drifting to 9. Pinning it makes a change to it
+	 * deliberate: an edit that moves the default has to move this line too.
+	 */
+	it("ships a Speed of 10 Generations per second", () => {
+		expect(DEFAULT_SETTINGS.generationsPerSecond).toBe(10);
+	});
+});
+
 describe("clampSetting", () => {
 	it("leaves a value already on the range and the step", () => {
 		expect(clampSetting(40, SETTING_BOUNDS.depthWindow)).toBe(40);
