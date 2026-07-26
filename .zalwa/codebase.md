@@ -10,8 +10,8 @@ walk around, adjust, resize, and start over.
 Issue #3 scaffolded the project and proved the deployment path. #4 built the simulation, #5 the bounded
 history window, #6 drew it, #8 gave it colour, fade, and cubic edge-drawn cells, #7 made it something you
 can walk around, #9 gave it a control panel for Speed, Depth Window, Maximum Age, and Cell Size, #10
-added staged Grid dimensions and Restart, #26 made Death by Old Age detonate, #32 signed the panel, and
-#11 laid the whole thing out for a phone.
+added staged Grid dimensions and Restart, #26 made Death by Old Age detonate, #32 signed the panel, #11
+laid the whole thing out for a phone, and #37 made that layout survive a real one.
 
 Not yet built: the drawing budget (#12) and link previews (#13). The instance ceiling the panel permits has
 never been measured — deliberate, and owned by #12.
@@ -25,6 +25,17 @@ screenshot to the repo root that is not gitignored (#34).
 nothing in `src/ui/` is reachable by a unit test — the phone layout is verified only by a local
 `pnpm smoke --phone` run that never executes in CI. #25 owns that harness, and until it lands every
 interface change is guarded by a screenshot and a pair of eyes.
+
+**A check that cannot fail is worse than no check.** #11's harness asserted that the sheet's *box* fits the
+viewport. `max-height` caps the box, so that assertion passes by construction while the content overflows
+inside it and scrolls — which is exactly what shipped. It now asserts `scrollHeight <= clientHeight`. When
+adding an assertion here, ask what state would make it fail; if there isn't one, it is reading as coverage
+without providing any.
+
+**Some defects are structurally unreachable headlessly, and the answer is a proxy, not a skip.** Chromium
+has no browser toolbar, so it cannot reproduce the iOS positioning bug at all. The harness instead asserts
+that the toggle's `offsetParent` is the layer — `null` for a fixed element, the layer for an absolute one —
+so a revert to `position: fixed` fails immediately. Not equivalent to a device, but the honest ceiling.
 
 What is built:
 
@@ -65,7 +76,7 @@ src/
     instances.ts      Instanced geometry, GLSL shaders, ring slot arithmetic, uniforms
     structure.ts      Binds a Run's Stack to the instance buffer; re-lays the ring
   ui/                 Control surface — mutates settings, knows nothing else
-    panel.ts          Six controls plus Restart, the sheet toggle, built from native range inputs
+    panel.ts          Six controls plus Restart, the sheet toggle, the 100dvh layer holding both
     panel.css         Both arrangements — desktop column, small-viewport sheet, coarse-pointer targets
     signature.ts      The author's mark — original SVG, links out to GitHub
 e2e/
@@ -455,8 +466,20 @@ column fails there by being taller than the window rather than by being too wide
 
 **Touch targets are keyed on `pointer: coarse`, never on viewport width.** Different questions, different
 answers: a tablet is wide enough for the desktop column and is still operated by thumb, while a narrow
-desktop window is small and still has a mouse. Only the *hit* area grows to 44px — the visible track stays
-2px, because the problem is where a tap lands, not what the panel looks like.
+desktop window is small and still has a mouse. Only the *hit* area grows — the visible track stays 2px and
+the signature mark stays small, because the problem is where a tap lands, not what the panel looks like.
+
+**There are two floors, not one, and #37 is why.** Restart, the toggle, and the signature get 44px: they
+are tapped once. Sliders get 32px. The first version gave everything 44px and the sheet needed 852px of
+content in a 664px viewport — six controls plus their separation accounted for 508px of it — so most of
+them ended up below the fold and *every* control got harder to reach. A slider is dragged rather than
+tapped and spans the panel's full width, so its height is the least of what makes it hittable. The
+guideline is about a target, not about a screenful of them.
+
+**The sheet's contents are tuned to fit with ~60px of slack, and the slack is not spare.** Every number was
+measured in headless Chromium on Linux; an iPhone resolves the same font stack to `-apple-system`, whose
+metrics differ. A layout measured to fit with two pixels to spare fits on the machine it was measured on.
+Adding a control means re-measuring — `pnpm smoke --phone` fails when the content stops fitting.
 
 **Nothing about the sheet's appearance is transitioned, and that is load-bearing.** The first version eased
 `opacity`, `transform`, and `visibility`, and the sheet never opened. A transition is created when the class
@@ -470,6 +493,23 @@ in that order. Before adding motion back, confirm the transition actually starts
 
 **The sheet is a flex column, so its children need `flex-shrink: 0`.** Content taller than the sheet makes
 every child a shrink candidate; the dismiss control collapsed from 44px to the 16px of its icon.
+
+**Nothing here uses `position: fixed`, and that is the whole of #37.** A fixed element resolves against the
+*layout* viewport, which on iOS Safari is the **large** viewport — the page as it would be with the browser
+toolbar collapsed. So a control pinned to `bottom` sits behind the toolbar and cannot be pressed. This
+shipped: the toggle was unreachable on the first real iPhone it met, while headless Chromium, which has no
+toolbar, measured it comfortably on screen.
+
+The panel and toggle instead live in **`.panel-layer`** — fixed, exactly `100dvh` tall, carrying the
+`env(safe-area-inset-*)` padding. `dvh` tracks what is actually visible, so `bottom` means the bottom of
+what the Viewer can see by construction rather than by arithmetic, and absolutely positioned children
+resolve against the padding box, so one declaration keeps both controls clear of the home indicator.
+`viewport-fit=cover` in `index.html` is what makes those insets resolve to anything but zero.
+
+**`pointer-events: none` on the layer is load-bearing.** The layer covers the whole viewport; without it
+every orbit, pan, and pinch lands on it instead of the camera and navigation silently stops working. The
+two controls re-enable pointer events for themselves. The desktop probe asserts the centre of the screen
+still hit-tests to the canvas.
 
 Note for anything positioning inside the panel: **`backdrop-filter` makes `.panel` a containing block for
 `position: fixed` descendants.** A fixed child does not escape to the viewport, it anchors to the panel.
