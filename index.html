@@ -32,12 +32,10 @@
        * structure is cut off until the Viewer happens to scroll it away. dvh
        * tracks what is actually visible, which is also what makes landscape
        * usable: the same rule fits both orientations without a second layout.
-       * The percentage stays as the fallback line for anything without dvh.
        */
       #viewport {
         display: block;
         width: 100%;
-        height: 100%;
         height: 100dvh;
         touch-action: none;
       }
