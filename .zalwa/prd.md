@@ -552,6 +552,8 @@ is currently true.
 
 ### B13 — Find who made it
 
+- #57 feat: a source link sits beside the author's mark
+
 At the bottom of the controls the Viewer sees a small bowler-hatted figure with an apple for a face, and a
 GitHub mark beside it. Activating the figure — by pointer or by touch — opens the author's site in a new
 tab; activating the GitHub mark opens this project's source. Either way the run carries on undisturbed in
