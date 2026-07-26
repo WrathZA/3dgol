@@ -9,8 +9,8 @@ walk around, adjust, resize, and start over.
 
 Issue #3 scaffolded the project and proved the deployment path. #4 built the simulation, #5 the bounded
 history window, #6 drew it, #8 gave it colour, fade, and cubic edge-drawn cells, #7 made it something you
-can walk around, #9 gave it a control panel for Speed, Depth Window, Maximum Age, and Cell Size, and #10
-added staged Grid dimensions and Restart.
+can walk around, #9 gave it a control panel for Speed, Depth Window, Maximum Age, and Cell Size, #10
+added staged Grid dimensions and Restart, and #26 made Death by Old Age detonate.
 
 Not yet built: phone layout (#11), the drawing budget (#12), and link previews (#13). The panel's layout is
 desktop-shaped — it scrolls rather than fits on a short viewport — and the instance ceiling it permits has
@@ -46,7 +46,7 @@ src/
   settings.ts         Starting values, bounds for every setting, clamping
   sim/                Pure simulation — imports nothing outside itself
     grid.ts           Grid storage, index arithmetic, Bounded Edge, neighbour counting
-    rules.ts          B3/S23 + age increment + Death by Old Age
+    rules.ts          B3/S23 + age increment + Death by Old Age + the Explosion
     stack.ts          LayerStack — ring buffer, Depth Window, retirement
     simulation.ts     Run state — generation counter, Maximum Age, Stack, advance(), restart()
     clock.ts          Elapsed time to Generations — pause, resume, backgrounded-tab cap
@@ -63,7 +63,7 @@ tests/
   sim/
     helpers.ts        Pattern-to-Grid fixtures and comparison helpers (not a test file)
     grid.test.ts      Dimensions, Bounded Edge, neighbour counting
-    rules.test.ts     Golden Life patterns, Age semantics, Death by Old Age
+    rules.test.ts     Golden Life patterns, Age semantics, Death by Old Age, the Explosion
     stack.test.ts     Retirement, Depth Window resize, constant memory, copy-not-reference
     simulation.test.ts Run lifecycle, Seed density, determinism, Maximum Age, Stack integration
     clock.test.ts     Pause banks nothing, resume has no burst, long gaps are capped
@@ -211,7 +211,7 @@ Exposes: `Grid`, `MAX_REPRESENTABLE_AGE`, `createGrid`, `indexOf`, `contains`, `
 
 ### `src/sim/rules.ts`
 
-Owns the rule: B3/S23 plus Death by Old Age.
+Owns the rule: B3/S23, plus Death by Old Age and the Explosion that accompanies it.
 
 `nextGeneration(current, next, maximumAge)` reads exclusively from `current` and writes exclusively to
 `next`. That separation is what makes every Cell see the same snapshot — computing in place would let
@@ -221,6 +221,29 @@ plausible-looking wrong output.
 `nextAge(age, liveNeighbours, maximumAge)` is exported deliberately so the age cap can be asserted
 directly rather than inferred from Grid output. **Death by Old Age is checked before neighbour count**,
 because it applies regardless of neighbours.
+
+**The Explosion (#26) is a second pass, not a branch inside the first.** `explode()` runs after the
+ordinary pass has finished and sets every in-bounds neighbour of a just-expired Cell to Age 1, overwriting
+whatever the ordinary rule decided for that position. Three properties are load-bearing and each has tests:
+
+- **It reads exclusively from `current`**, so nothing chains within a Generation. A position lit by one
+  Explosion cannot itself explode until it has aged to the cap again. Running it *after* the ordinary pass
+  rather than interleaved is what keeps every Cell on the same snapshot.
+- **Only Death by Old Age explodes.** Ordinary over- and underpopulation deaths stay silent. This is not
+  taste: modelling showed that exploding on every death saturates a 48×48 Grid to 76% live within three
+  Generations and holds it there, which collapses the Colour Gradient to one colour and makes the Maximum
+  Age slider a no-op.
+- **A neighbour that also reached the cap is not revived.** Two adjacent Cells at the cap are each other's
+  neighbour; reviving them would let a cluster reset itself wholesale and the cap would stop breaking up the
+  configurations it exists to disturb. A cluster therefore leaves a hole ringed by young Cells.
+
+`diesOfOldAge(age, maximumAge)` is the shared trigger, exported. Both `nextAge` and `explode` call it, so
+the two passes cannot drift into disagreeing about which Cells died — a divergence that would produce Cells
+dying without exploding, or exploding without dying. `>=` rather than `===` because Maximum Age is
+Viewer-adjustable and lowering it leaves Cells already past the new value.
+
+The Bounded Edge holds inside the Explosion: every write is gated by `contains()`, so a detonation at the
+boundary scatters only inward.
 
 ### `src/sim/stack.ts`
 
@@ -258,7 +281,9 @@ get reproducible Runs.
 
 Setting `maximumAge` does **not** reach into the Grid to kill over-age Cells; they die on the next
 `advance()`, where the rule lives. Duplicating the rule in the setter would create two copies that
-eventually disagree.
+eventually disagree. Since #26 this also has a visible payoff: lowering the slider past a lot of
+established Cells detonates all of them at once on the next Generation, which is the most direct way a
+Viewer can make something happen on demand.
 
 `advance()` pushes the new Generation onto the Stack. `restart()` clears it and pushes the Seed — **a
 fresh Stack holds one Layer, not zero.** Generation 0 is a Generation like any other, and skipping it
@@ -411,6 +436,12 @@ without checking a short viewport reintroduces that, and nothing automated guard
   96 is four times 48, not twice. Every instance is transformed each frame whether its Cell is alive or dead,
   and in a typical Run most are dead. There is no server to absorb any of it. `SETTING_BOUNDS` is
   deliberately the single place #12 writes the measured limit for both halves of the product.
+- **The Colour Gradient is tuned for a short lifespan and the default lifespan is now 200.** Colour maps
+  across a Cell's whole lifetime, so at A=200 the Ages a Run actually spends most of its Cells at occupy
+  only the first fraction of the palette and the structure reads near-monochrome. `AGE_GRADIENT_CURVE` is
+  not wrong — one fixed curve cannot serve both A=4 and A=200. This works against B11 at the one setting
+  every first-time visitor sees, and is the clearest open cost against principle 2. Making the curve adapt
+  to A is unmeasured visual tuning with its own issue.
 - **Smoothness has never been observed on a real GPU.** Every render check so far ran against a software
   rasteriser, whose frame timings mean nothing. The design keeps per-frame CPU work constant, but that is
   reasoning, not evidence.
