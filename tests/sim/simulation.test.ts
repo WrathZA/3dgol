@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ageAt, population, setAgeAt } from "@/sim/grid";
+import { GOSPER_GLIDER_GUN } from "@/sim/patterns";
 import {
 	DEFAULT_SEED_DENSITY,
 	type RandomSource,
@@ -296,6 +297,172 @@ describe("Simulation", () => {
 			] as const) {
 				expect(ageAt(simulation.grid, column, row)).toBe(3);
 			}
+		});
+	});
+
+	describe("Pattern", () => {
+		/** A Run seeded with the gun, on a Grid the interface would permit. */
+		function gunRun(explosion = false, maximumAge = 200) {
+			const simulation = new Simulation({
+				width: 50,
+				height: 50,
+				maximumAge,
+				explosion,
+				random: seededRandom(3),
+			});
+			simulation.restart(GOSPER_GLIDER_GUN);
+			return simulation;
+		}
+
+		it("puts the Pattern and nothing else in Generation 0", () => {
+			const simulation = gunRun();
+
+			expect(simulation.generation).toBe(0);
+			// Every live Cell is newborn, and there are exactly as many as the Pattern
+			// draws — so no random Seed survived underneath it.
+			let live = 0;
+			for (const age of simulation.grid.ages) {
+				if (age > 0) {
+					expect(age).toBe(1);
+					live++;
+				}
+			}
+			expect(live).toBe(36);
+		});
+
+		it("places it inset from the top-left, leaving the Pattern's output room", () => {
+			const simulation = gunRun();
+
+			// The left reflector block sits at the Pattern's rows 4-5, columns 0-1,
+			// so on the Grid it lands one Cell in from each edge.
+			expect(ageAt(simulation.grid, 1, 5)).toBe(1);
+			expect(ageAt(simulation.grid, 2, 5)).toBe(1);
+			expect(ageAt(simulation.grid, 1, 6)).toBe(1);
+			expect(ageAt(simulation.grid, 2, 6)).toBe(1);
+
+			// Nothing on the boundary itself.
+			for (let column = 0; column < simulation.width; column++) {
+				expect(ageAt(simulation.grid, column, 0)).toBe(0);
+			}
+			for (let row = 0; row < simulation.height; row++) {
+				expect(ageAt(simulation.grid, 0, row)).toBe(0);
+			}
+
+			// And the whole lower-right of the Grid is clear, which is the room the
+			// gliders travel into.
+			expect(population(simulation.grid)).toBe(36);
+			for (let row = 11; row < simulation.height; row++) {
+				for (let column = 0; column < simulation.width; column++) {
+					expect(ageAt(simulation.grid, column, row)).toBe(0);
+				}
+			}
+		});
+
+		it("is a working gun — still emitting after 60 Generations", () => {
+			const simulation = gunRun();
+
+			for (let generation = 0; generation < 60; generation++) {
+				simulation.advance();
+			}
+
+			// A gun is not a still life and not a dying soup: it emits a glider every
+			// 30 Generations, so the population climbs rather than settling. Two
+			// gliders (5 Cells each) have left by Generation 60.
+			expect(population(simulation.grid)).toBeGreaterThan(36);
+
+			// The machinery survived — the left reflector block's permanent outer
+			// column has been alive throughout, so its Age is the Generation count.
+			expect(ageAt(simulation.grid, 1, 5)).toBe(61);
+			expect(ageAt(simulation.grid, 1, 6)).toBe(61);
+
+			// And something has reached the lower-right, which nothing does unless
+			// gliders are actually travelling.
+			let reachedFar = false;
+			for (let row = 12; row < simulation.height; row++) {
+				for (let column = 12; column < simulation.width; column++) {
+					if (ageAt(simulation.grid, column, row) > 0) {
+						reachedFar = true;
+					}
+				}
+			}
+			expect(reachedFar).toBe(true);
+		});
+
+		it("stays a gun rather than degenerating, 300 Generations in", () => {
+			// The check that the Pattern data is *actually* Gosper's gun and not
+			// approximately it. A wrong arrangement dies or collapses into chaos, and
+			// chaos on a Bounded Edge Grid fills it — the steady population below is
+			// what a working period-30 gun looks like once gliders are leaving at the
+			// same rate the boundary destroys them.
+			const simulation = gunRun();
+
+			for (let generation = 0; generation < 300; generation++) {
+				simulation.advance();
+			}
+
+			// The four Cells that never change state: the *outer* column of each
+			// reflector block. The inner column does not survive — a reflector is a
+			// catalyst rather than a still life, so the shuttle disturbs its near face
+			// every cycle and the block reforms. Asserting all eight would be asserting
+			// something a working gun does not do.
+			//
+			// These four are what reaches Maximum Age, which is why the Explosion
+			// dismantles the gun and why #30 blocked this issue.
+			for (const [column, row] of [
+				[1, 5],
+				[1, 6],
+				[36, 3],
+				[36, 4],
+			] as const) {
+				expect(ageAt(simulation.grid, column, row)).toBe(200);
+			}
+
+			// Steady rather than growing or dying: measured at 56 here and still 56 at
+			// Generation 600.
+			expect(population(simulation.grid)).toBe(56);
+		});
+
+		it("is dismantled by the Explosion, which is why #30 blocked this", () => {
+			// The gun's reflector blocks never change state, so they age continuously
+			// and reach Maximum Age. With the Explosion on they detonate and the gun
+			// destroys itself — the dependency that made #30 a blocker rather than a
+			// tidiness concern. A low cap brings it forward from ~200 Generations.
+			const simulation = gunRun(true, 20);
+
+			for (let generation = 0; generation < 30; generation++) {
+				simulation.advance();
+			}
+
+			// The left block's position has been through a detonation, so it is no
+			// longer the settled pair it started as.
+			const settled =
+				ageAt(simulation.grid, 1, 5) > 20 && ageAt(simulation.grid, 2, 5) > 20;
+			expect(settled).toBe(false);
+		});
+
+		it("still seeds randomly when no Pattern is given", () => {
+			const simulation = gunRun();
+			simulation.restart();
+
+			// A random Seed at the default density fills far more of a 50x50 Grid than
+			// a 36-Cell Pattern does.
+			expect(population(simulation.grid)).toBeGreaterThan(500);
+			expect(simulation.generation).toBe(0);
+		});
+
+		it("throws rather than clipping a Pattern too large for the Grid", () => {
+			// Unreachable from the interface, since the Grid floor is set from the
+			// largest Pattern — so it is a programmer error and stack.md says those
+			// are loud.
+			const simulation = new Simulation({
+				width: 20,
+				height: 20,
+				maximumAge: 200,
+			});
+
+			expect(() => simulation.restart(GOSPER_GLIDER_GUN)).toThrow(
+				/larger than the 20x20 Grid/,
+			);
 		});
 	});
 

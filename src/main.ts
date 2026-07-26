@@ -2,8 +2,9 @@ import { createScene } from "@/render/scene";
 import { createStructureView, type StructureView } from "@/render/structure";
 import { clampSettings, DEFAULT_SETTINGS, SETTING_BOUNDS } from "@/settings";
 import { advanceClock, retimeAccumulator } from "@/sim/clock";
+import { PATTERNS, type Pattern } from "@/sim/patterns";
 import { Simulation } from "@/sim/simulation";
-import { createControlPanel } from "@/ui/panel";
+import { createControlPanel, type RestartRequest } from "@/ui/panel";
 
 /**
  * Composition root: wires the Simulation, the renderer, and the control panel,
@@ -102,7 +103,7 @@ interface Run {
  * That is acceptable here and nowhere else, because it happens on a Viewer
  * action rather than per Generation or per frame.
  */
-function startRun(previous: Run | undefined): Run {
+function startRun(previous: Run | undefined, pattern: Pattern | null): Run {
 	if (previous !== undefined) {
 		stage.scene.remove(previous.view.mesh);
 		previous.view.dispose();
@@ -118,6 +119,13 @@ function startRun(previous: Run | undefined): Run {
 		maximumAge: settings.maximumAge,
 		explosion: settings.explosion,
 	});
+
+	// The constructor already seeded randomly. A Pattern replaces that Seed rather
+	// than being placed alongside it, and doing so here keeps the Simulation's own
+	// constructor path unchanged.
+	if (pattern !== null) {
+		simulation.restart(pattern);
+	}
 
 	const view = createStructureView(simulation, {
 		cellSize: settings.cellSize,
@@ -146,7 +154,9 @@ function startRun(previous: Run | undefined): Run {
 	};
 }
 
-let run = startRun(undefined);
+// A fresh page load always seeds randomly. The opening state is nobody's choice —
+// which is what keeps the Actors list at one even now that Patterns exist.
+let run = startRun(undefined, null);
 
 /**
  * Whether the Viewer has asked for a Restart since the last frame.
@@ -158,13 +168,16 @@ let run = startRun(undefined);
  * requested while paused behaves exactly like any other, because the loop runs
  * regardless of Speed.
  */
-const restart = { requested: false };
+const restart: RestartRequest = { requested: false, pattern: null };
 
 const panel = createControlPanel(settings, restart, {
 	// Read on demand rather than passed by value: the panel compares the staged
 	// Grid against the running one to decide whether a Restart is pending, and the
 	// running one changes underneath it.
 	runningGrid: () => ({ width: run.width, height: run.height }),
+	// The panel is handed the Patterns rather than importing them, so it keeps
+	// knowing nothing about the Simulation.
+	patterns: PATTERNS,
 });
 
 let lastFrameTime = performance.now();
@@ -181,14 +194,16 @@ let lastFrameTime = performance.now();
  * Both give a genuinely different Run, because the Seed is drawn afresh either
  * way. The Viewer chooses *when* a Seed is generated, never what it holds.
  */
-function restartRun(): void {
+function restartRun(pattern: Pattern | null): void {
 	const dimensionsChanged =
 		settings.gridWidth !== run.width || settings.gridHeight !== run.height;
 
 	if (dimensionsChanged) {
-		run = startRun(run);
+		run = startRun(run, pattern);
 	} else {
-		run.simulation.restart();
+		// `undefined` rather than `null` — the Simulation's argument is optional,
+		// and absent is what means "draw a fresh random Seed".
+		run.simulation.restart(pattern ?? undefined);
 		run.view.reset();
 		run.accumulated = 0;
 	}
@@ -248,7 +263,11 @@ function frame(now: number): void {
 	// having settings applied to it.
 	if (restart.requested) {
 		restart.requested = false;
-		restartRun();
+		// Taken and cleared together, so a Pattern applies to exactly the Restart it
+		// was chosen for and the next Random is genuinely random.
+		const pattern = restart.pattern;
+		restart.pattern = null;
+		restartRun(pattern);
 	}
 
 	if (settings.generationsPerSecond !== run.appliedSpeed) {

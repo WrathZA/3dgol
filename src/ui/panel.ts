@@ -7,6 +7,11 @@ import {
 	type SettingBound,
 	type Settings,
 } from "@/settings";
+// Type-only, and deliberately so: the panel needs to know what a Pattern *is* to
+// hand one back on the Restart request, but not which ones exist. The list is
+// passed in by the composition root, so this module still imports nothing from
+// the Simulation at runtime.
+import type { Pattern } from "@/sim/patterns";
 import { createSignatureMark } from "@/ui/signature";
 
 /** Where the mark points. The product's only outbound link. */
@@ -28,7 +33,8 @@ let panelsBuilt = 0;
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
 /**
- * The control surface: the settings the Viewer can move, and the Restart button.
+ * The control surface: the settings the Viewer can move, and the two ways to
+ * start a fresh Run — a Pattern from a fixed list, or a random Seed.
  *
  * This module mutates plain objects and does nothing else. It knows nothing about
  * the Simulation or the renderer, and neither knows about it — whoever composed
@@ -60,9 +66,17 @@ export interface ControlPanel {
 	dispose(): void;
 }
 
-/** The Restart request the loop consumes. Raised here, lowered there. */
+/**
+ * The Restart request the loop consumes. Raised here, lowered there.
+ *
+ * `pattern` is what Generation 0 will hold — `null` for a random Seed, which is
+ * what Random asks for. Carried on the request rather than held as panel state
+ * because a Pattern is chosen *for one Restart*: the next Random must not
+ * silently reuse the last Pattern picked.
+ */
 export interface RestartRequest {
 	requested: boolean;
+	pattern: Pattern | null;
 }
 
 /** Grid dimensions of the Run actually in progress, as opposed to staged. */
@@ -79,6 +93,15 @@ export interface ControlPanelOptions {
 	 * staged dimension change *will* do without knowing when a Restart happens.
 	 */
 	runningGrid?: () => RunningGrid;
+	/**
+	 * Starting arrangements to offer, in the order they are listed.
+	 *
+	 * Supplied rather than imported so the panel has no opinion about which
+	 * Patterns exist — the composition root owns that. Empty means the Pattern
+	 * control is not built at all, which is what keeps a panel with no Patterns
+	 * from showing an empty dropdown.
+	 */
+	patterns?: readonly Pattern[];
 	parent?: HTMLElement;
 }
 
@@ -202,6 +225,7 @@ export function createControlPanel(
 	const runningGrid =
 		options.runningGrid ??
 		(() => ({ width: settings.gridWidth, height: settings.gridHeight }));
+	const patterns = options.patterns ?? [];
 
 	panelsBuilt += 1;
 	const panelId = `structure-controls-${panelsBuilt}`;
@@ -426,6 +450,17 @@ export function createControlPanel(
 		element.append(wrapper);
 	}
 
+	/*
+	 * The two ways to start a fresh Run, on one row.
+	 *
+	 * Together rather than stacked because they are the same act with different
+	 * contents — both clear the Stack, reset the counter, and apply staged Grid
+	 * dimensions; only Generation 0 differs. Sharing a row says that, and it is
+	 * also what lets a seventh control into a sheet a portrait phone shows whole.
+	 */
+	const startRow = document.createElement("div");
+	startRow.className = "panel__start";
+
 	const restartButton = document.createElement("button");
 	restartButton.type = "button";
 	restartButton.className = "panel__restart";
@@ -434,7 +469,64 @@ export function createControlPanel(
 		// replaced, so a Restart cannot land part-way through a frame.
 		restart.requested = true;
 	});
-	element.append(restartButton);
+
+	if (patterns.length > 0) {
+		const chooser = document.createElement("select");
+		chooser.className = "panel__pattern";
+		// The drawing is the whole control, so the accessible name has to come from
+		// here — there is no visible label to wrap, the row being shared with a
+		// button that has its own.
+		chooser.setAttribute("aria-label", "Start from a pattern");
+
+		/*
+		 * A placeholder the control returns to after every choice.
+		 *
+		 * Load-bearing rather than decorative. A `<select>` fires no `change` event
+		 * when the already-selected option is chosen again, so without something to
+		 * return to, picking the same Pattern twice would silently do nothing — the
+		 * Viewer presses it and the product ignores them. Resetting the value in the
+		 * handler means the next choice is always a change, whichever it is.
+		 */
+		const placeholder = document.createElement("option");
+		placeholder.value = "";
+		placeholder.textContent = "Pattern…";
+		chooser.append(placeholder);
+
+		patterns.forEach((pattern, index) => {
+			const option = document.createElement("option");
+			option.value = String(index);
+			option.textContent = pattern.name;
+			chooser.append(option);
+		});
+
+		chooser.addEventListener("change", () => {
+			const selected = chooser.value;
+			// Back to the placeholder before anything else, so the control is ready to
+			// fire again even if the Restart below is somehow not taken.
+			chooser.value = "";
+
+			// The placeholder is a selection like any other, and reaching it fires a
+			// change: a keyboard Viewer arrowing down to a Pattern and back up lands
+			// here. Rejected explicitly rather than left to the lookup, because
+			// `Number("")` is 0 — so falling through would silently start a Run with
+			// the first Pattern in the list.
+			if (selected === "") {
+				return;
+			}
+
+			const chosen = patterns[Number(selected)];
+			if (chosen === undefined) {
+				return;
+			}
+			restart.pattern = chosen;
+			restart.requested = true;
+		});
+
+		startRow.append(chooser);
+	}
+
+	startRow.append(restartButton);
+	element.append(startRow);
 
 	/**
 	 * Says on the button itself what a Restart will now do.
@@ -445,9 +537,11 @@ export function createControlPanel(
 	function syncPending(): void {
 		const pending = restartPending();
 		restartButton.classList.toggle("panel__restart--pending", pending);
+		// "Random" rather than "Restart" now that it is one of two ways to start a
+		// Run — the other names a Pattern, so this one names what it seeds with.
 		restartButton.textContent = pending
-			? `Restart at ${settings.gridWidth} × ${settings.gridHeight}`
-			: "Restart";
+			? `Random at ${settings.gridWidth} × ${settings.gridHeight}`
+			: "Random";
 	}
 
 	syncPending();
