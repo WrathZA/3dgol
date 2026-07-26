@@ -69,8 +69,8 @@ export const SETTING_BOUNDS = {
 	 *
 	 * The ceiling is 200, and the default sits on it. That is a deliberate
 	 * choice with a real cost: nothing reaches the cap before Generation 200,
-	 * so the first Explosion lands around Generation 214 — roughly half a
-	 * minute at the default Speed — and until then the Run behaves like classic
+	 * so the first Explosion lands around Generation 214 — roughly twenty
+	 * seconds at the default Speed — and until then the Run behaves like classic
 	 * Conway and decays. What it buys is the sparse, dramatic reading: Cells
 	 * spread right across the Colour Gradient instead of bunching young, long
 	 * pillars accumulate, and their Explosions are rare events rather than
