@@ -10,15 +10,19 @@ walk around, adjust, resize, and start over.
 Issue #3 scaffolded the project and proved the deployment path. #4 built the simulation, #5 the bounded
 history window, #6 drew it, #8 gave it colour, fade, and cubic edge-drawn cells, #7 made it something you
 can walk around, #9 gave it a control panel for Speed, Depth Window, Maximum Age, and Cell Size, #10
-added staged Grid dimensions and Restart, #26 made Death by Old Age detonate, #32 signed the panel, #11
-laid the whole thing out for a phone, #37 made that layout survive a real one, and #29 raised the starting
-Speed to 10 Generations per second.
+added staged Grid dimensions and Restart, #26 made reaching Maximum Age detonate, #32 signed the panel, #11
+laid the whole thing out for a phone, #37 made that layout survive a real one, #29 raised the starting
+Speed to 10 Generations per second, and #30 made the detonation a reset rather than a death and gave the
+Viewer a switch for it.
 
 Not yet built: link previews (#13). The instance ceiling the panel permits has never been measured —
 deliberate, and owned by #12, which is now `priority:deferred` and reachable only via `/zalwa-ride 12`.
 
-Queued: the Explosion gains an off switch (#30), the author's mark is under the contrast threshold at rest
-(#35), and `pnpm smoke` writes a screenshot to the repo root that is not gitignored (#34).
+Queued: the author's mark is under the contrast threshold at rest (#35), `pnpm smoke` writes a screenshot to
+the repo root that is not gitignored (#34), and the PRD's tuned-defaults list does not name the starting
+Speed (#41). #42 (a starting-pattern picker) was blocked by #30 and is now unblocked — a Gosper's gun needs
+the permanence the Explosion switch provides, since its reflector blocks would otherwise detonate and
+dismantle the gun after about two hundred Generations.
 
 Deferred by decision rather than by ordering: the drawing budget (#12) and the near-monochrome Colour
 Gradient at the A=200 default (#28) both carry `priority:deferred`, so neither surfaces in auto-pick. #31
@@ -71,7 +75,7 @@ src/
   settings.ts         Starting values, bounds for every setting, clamping
   sim/                Pure simulation — imports nothing outside itself
     grid.ts           Grid storage, index arithmetic, Bounded Edge, neighbour counting
-    rules.ts          B3/S23 + age increment + Death by Old Age + the Explosion
+    rules.ts          B3/S23 + saturating age + the Explosion at Maximum Age
     stack.ts          LayerStack — ring buffer, Depth Window, retirement
     simulation.ts     Run state — generation counter, Maximum Age, Stack, advance(), restart()
     clock.ts          Elapsed time to Generations — pause, resume, backgrounded-tab cap
@@ -80,7 +84,7 @@ src/
     instances.ts      Instanced geometry, GLSL shaders, ring slot arithmetic, uniforms
     structure.ts      Binds a Run's Stack to the instance buffer; re-lays the ring
   ui/                 Control surface — mutates settings, knows nothing else
-    panel.ts          Six controls plus Restart, the sheet toggle, the 100dvh layer holding both
+    panel.ts          Seven controls plus Restart, the sheet toggle, the 100dvh layer holding both
     panel.css         Both arrangements — desktop column, small-viewport sheet, coarse-pointer targets
     signature.ts      The author's mark — original SVG, links out to GitHub
 e2e/
@@ -89,9 +93,9 @@ tests/
   sim/
     helpers.ts        Pattern-to-Grid fixtures and comparison helpers (not a test file)
     grid.test.ts      Dimensions, Bounded Edge, neighbour counting
-    rules.test.ts     Golden Life patterns, Age semantics, Death by Old Age, the Explosion
+    rules.test.ts     Golden Life patterns, Age semantics, saturation, the Explosion
     stack.test.ts     Retirement, Depth Window resize, constant memory, copy-not-reference
-    simulation.test.ts Run lifecycle, Seed density, determinism, Maximum Age, Stack integration
+    simulation.test.ts Run lifecycle, Seed density, determinism, Maximum Age, the Explosion, Stack
     clock.test.ts     Pause banks nothing, resume has no burst, long gaps are capped
   render/
     instances.test.ts Ring slot arithmetic and Stack placement height
@@ -163,10 +167,13 @@ so a value is live mid-drag. `main.ts` compares a handful of scalars per frame a
 and acts on the difference — constant work regardless of instance count. Nothing observes, subscribes, or
 notifies: the interface would otherwise need opinions about what each setting affects.
 
-**Live settings versus staged settings.** Speed, Depth Window, Maximum Age, and Cell Size reach the Run on
-the next frame. Grid width and height are *staged* — read only when a Run starts, because a Layer computed at
-one Grid size cannot coherently stack on Layers computed at another. All six are bounded in the same table;
-being bounded and being applied immediately are separate questions.
+**Live settings versus staged settings.** Speed, Depth Window, Maximum Age, the Explosion, and Cell Size
+reach the Run on the next frame. Grid width and height are *staged* — read only when a Run starts, because a
+Layer computed at one Grid size cannot coherently stack on Layers computed at another. The six numeric
+settings are bounded in the same table; being bounded and being applied immediately are separate questions.
+The Explosion has no entry there, because a boolean has no range — which is why `SETTING_BOUNDS` and
+`clampSettings` stay numeric and `panel.ts` derives its switch-able settings from the `Settings` type
+instead.
 
 The consequence is an interface obligation, not just a code one: a staged change that silently waits is
 indistinguishable from one that failed, so `panel.ts` marks a staged value whose Run has not caught up yet
@@ -237,36 +244,49 @@ Exposes: `Grid`, `MAX_REPRESENTABLE_AGE`, `createGrid`, `indexOf`, `contains`, `
 
 ### `src/sim/rules.ts`
 
-Owns the rule: B3/S23, plus Death by Old Age and the Explosion that accompanies it.
+Owns the rule: B3/S23, plus the Explosion.
 
-`nextGeneration(current, next, maximumAge)` reads exclusively from `current` and writes exclusively to
-`next`. That separation is what makes every Cell see the same snapshot — computing in place would let
-Cells resolved earlier in the pass influence Cells resolved later, which is not Life and produces
+`nextGeneration(current, next, maximumAge, explosion)` reads exclusively from `current` and writes
+exclusively to `next`. That separation is what makes every Cell see the same snapshot — computing in place
+would let Cells resolved earlier in the pass influence Cells resolved later, which is not Life and produces
 plausible-looking wrong output.
 
-`nextAge(age, liveNeighbours, maximumAge)` is exported deliberately so the age cap can be asserted
-directly rather than inferred from Grid output. **Death by Old Age is checked before neighbour count**,
-because it applies regardless of neighbours.
+**Age alone never kills (#30).** Maximum Age is a trigger and the top of the Colour Gradient, not a
+lifespan. `nextAge(age, liveNeighbours, maximumAge)` is plain Conway with one wrinkle — surviving Age is
+`Math.min(age + 1, maximumAge)`, so it saturates rather than counting past the cap. There is deliberately no
+branch for death by Age, and adding one back is the defect this file is most likely to acquire: the phrase
+"maximum age" reads as a lifespan and the code written from that reading is wrong. The clamp is
+unconditional because it costs nothing to make it so — with the Explosion on, a capped Cell is rewritten to
+1 by its own burst before the clamp could bind; with it off, the clamp is what keeps the Gradient's top end
+defined instead of every long-lived Cell sharing the final colour.
 
-**The Explosion (#26) is a second pass, not a branch inside the first.** `explode()` runs after the
-ordinary pass has finished and sets every in-bounds neighbour of a just-expired Cell to Age 1, overwriting
-whatever the ordinary rule decided for that position. Three properties are load-bearing and each has tests:
+**The Explosion (#26) is a second pass, not a branch inside the first.** `explode()` runs after the ordinary
+pass has finished and writes Age 1 across the full 3×3 around a Cell that has reached the cap — **its own
+position included** — overwriting whatever the ordinary rule decided. Reviving itself is what makes the
+burst a reset rather than a death with a flourish: a Cell the ordinary rule would have removed for
+underpopulation is brought back by its own detonation, and a cluster at the cap leaves a solid patch of new
+colour instead of a hole. Three properties are load-bearing and each has tests:
 
 - **It reads exclusively from `current`**, so nothing chains within a Generation. A position lit by one
   Explosion cannot itself explode until it has aged to the cap again. Running it *after* the ordinary pass
   rather than interleaved is what keeps every Cell on the same snapshot.
-- **Only Death by Old Age explodes.** Ordinary over- and underpopulation deaths stay silent. This is not
+- **Only reaching Maximum Age explodes.** Ordinary over- and underpopulation deaths stay silent. This is not
   taste: modelling showed that exploding on every death saturates a 48×48 Grid to 76% live within three
   Generations and holds it there, which collapses the Colour Gradient to one colour and makes the Maximum
-  Age slider a no-op.
-- **A neighbour that also reached the cap is not revived.** Two adjacent Cells at the cap are each other's
-  neighbour; reviving them would let a cluster reset itself wholesale and the cap would stop breaking up the
-  configurations it exists to disturb. A cluster therefore leaves a hole ringed by young Cells.
+  Age slider a no-op. Detonating only at the cap settles at 3–7% live at the default A and 11–21% at A=4,
+  measured across three seeds over 600 Generations.
+- **`explosion === false` skips the pass entirely** rather than running a quieter version of it. The rule is
+  then plain Conway and nothing whatsoever happens at Maximum Age. There is no third state in which a Cell
+  dies quietly of Age — see `.zalwa/principles.md` principle 6.
 
-`diesOfOldAge(age, maximumAge)` is the shared trigger, exported. Both `nextAge` and `explode` call it, so
-the two passes cannot drift into disagreeing about which Cells died — a divergence that would produce Cells
-dying without exploding, or exploding without dying. `>=` rather than `===` because Maximum Age is
-Viewer-adjustable and lowering it leaves Cells already past the new value.
+**There is no exception for a neighbour that also reached the cap**, and one must not be re-added. It
+existed while the cap still killed, to stop a cluster reviving itself wholesale; now that a capped Cell
+revives its own position, such a neighbour lands at 1 through its own burst regardless, so the branch cannot
+change an outcome and only reads as though it could.
+
+`reachedMaximumAge(age, maximumAge)` is the trigger, exported so it can be asserted directly. It is the
+Explosion's condition and nothing else — a Cell answering true is not removed, it detonates. `>=` rather
+than `===` because Maximum Age is Viewer-adjustable and lowering it leaves Cells already past the new value.
 
 The Bounded Edge holds inside the Explosion: every write is gated by `contains()`, so a detonation at the
 boundary scatters only inward.
@@ -298,18 +318,23 @@ Exposes: `LayerStack`, `validateMaxDepth`.
 
 ### `src/sim/simulation.ts`
 
-Owns Run state: the current Grid, the generation counter, Maximum Age, and the Stack.
+Owns Run state: the current Grid, the generation counter, Maximum Age, the Explosion flag, and the Stack.
 
 Holds two Grids allocated once at construction and swaps them on `advance()` — no allocation per
 Generation, because GC pauses read as stutter in a continuously animating product. `restart()` ends the
 Run and reseeds randomly from a `RandomSource`, which defaults to `Math.random` and is injectable so tests
 get reproducible Runs.
 
-Setting `maximumAge` does **not** reach into the Grid to kill over-age Cells; they die on the next
-`advance()`, where the rule lives. Duplicating the rule in the setter would create two copies that
+Setting `maximumAge` does **not** reach into the Grid to act on over-age Cells; they are dealt with on the
+next `advance()`, where the rule lives. Duplicating the rule in the setter would create two copies that
 eventually disagree. Since #26 this also has a visible payoff: lowering the slider past a lot of
 established Cells detonates all of them at once on the next Generation, which is the most direct way a
 Viewer can make something happen on demand.
+
+Setting `explosion` follows the same discipline (#30) and is tested for it: the switch alone changes nothing
+already computed — the Generation counter, every held Layer, and the Grid are untouched — and takes effect
+from the next `advance()`. Switching it on does not retroactively detonate the Cells already sitting at the
+cap; they detonate at the next Generation.
 
 `advance()` pushes the new Generation onto the Stack. `restart()` clears it and pushes the Seed — **a
 fresh Stack holds one Layer, not zero.** Generation 0 is a Generation like any other, and skipping it
@@ -437,20 +462,45 @@ should not throw away where they were standing.
 
 ### `src/ui/panel.ts`
 
-Six controls and the Restart button. Mutates plain objects; imports nothing from `sim/` or `render/`.
+Seven controls — six sliders and a switch — plus the Restart button. Mutates plain objects; imports nothing
+from `sim/` or `render/`.
 
-Native `<input type="range">` restyled rather than hand-drawn sliders: pointer capture, touch, keyboard,
-and screen-reader semantics come free, and #11's touch requirement depends on that half already working.
-Each control is a `<label>` wrapping its own input, so no generated ids are needed and the panel is safe to
-build more than once.
+Native `<input type="range">` and `<input type="checkbox">` restyled rather than hand-drawn controls:
+pointer capture, touch, keyboard, and screen-reader semantics come free, and #11's touch requirement depends
+on that half already working. Each control is a `<label>` wrapping its own input, so no generated ids are
+needed and the panel is safe to build more than once.
 
-`SETTING_BOUNDS` in `settings.ts` is the single source for every control's range and step — the panel reads
+`SETTING_BOUNDS` in `settings.ts` is the single source for every slider's range and step — the panel reads
 it, and clamping is applied on every write so a value off the step never reaches the ring arithmetic.
 
+**`CONTROLS` is a discriminated union on `kind` (#30)**, so a boolean setting is offered as a switch and a
+bounded one as a slider without a second list to keep in step. The `BooleanSetting` mapped type derives the
+switch-able keys from `Settings` itself rather than listing them, so a boolean added or removed there is
+reflected here or stops compiling.
+
+**The switch's readout is `aria-hidden`, and that is not decoration.** The `<label>` wraps both the name and
+the readout, so anything readable in the readout joins the checkbox's accessible name — which would make it
+"Explosion On", a name that changes as the control is used while the checkbox's own checked state already
+carries it. Same reasoning as the panel toggle's `aria-label`: state belongs in the state, not in the name.
+This shipped as a defect and was caught by the persona gate with typecheck, lint, tests, and the smoke check
+all green.
+
+**No divider above the switch.** Maximum age and the Explosion are one mechanism, and a rule between them
+would read as two unrelated settings sharing a word. It also buys the height that lets a seventh control fit
+a portrait phone.
+
 **The panel is bounded to the viewport height and scrolls inside itself.** It is `position: fixed`, so
-anything past the bottom of the viewport is unreachable — there is no page to scroll. With six controls and a
-button it exceeds a short window, and the control that fell off the end was Restart. `pnpm smoke --phone`
+anything past the bottom of the viewport is unreachable — there is no page to scroll. With seven controls and
+a button it exceeds a short window, and the control that fell off the end was Restart. `pnpm smoke --phone`
 now guards this in both orientations; nothing guards it at desktop sizes.
+
+**Hit heights are an interface-wide budget, not a per-control target (#37, #30).** Sliders and the switch
+take 32px on a coarse pointer; Restart, the toggle, and the signature take 44px. Both are measured by
+`pnpm smoke --phone`. The switch was added at 44px and pushed the portrait sheet 17px past the screen, so it
+scrolled — a control technically large and actually harder to reach, which is the #10 failure the check
+exists to catch. It takes the slider minimum on the rationale the stylesheet already records: the label
+wraps the input, so the hit area is the sheet's full width and height is the least of what makes it
+hittable.
 
 The cap is in `dvh` and the panel is `border-box`, and both were bugs. `vh` measures a phone's viewport as
 if the browser toolbar were already collapsed, so a bound in `vh` still puts Restart underneath it. And
