@@ -185,14 +185,6 @@ const CONTROLS: readonly ControlSpec[] = [
 	},
 	{
 		kind: "slider",
-		setting: "cellSize",
-		label: "Cell size",
-		// A proportion of the lattice spacing, which is what the number means:
-		// 100% is Cells touching.
-		format: (value) => `${Math.round(value * 100)}%`,
-	},
-	{
-		kind: "slider",
 		setting: "gridWidth",
 		label: "Grid width",
 		format: (value) => `${value} cells`,
