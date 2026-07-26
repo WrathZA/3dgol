@@ -13,13 +13,17 @@ import { createSignatureMark } from "@/ui/signature";
 const AUTHOR_PROFILE = "https://github.com/WrathZA";
 
 /**
- * The panel's id, so the toggle can point `aria-controls` at it.
+ * Panels built so far, so each one's id is its own.
  *
  * The one generated id in a module that otherwise avoids them by wrapping each
  * input in its own `<label>`. `aria-controls` takes an id and nothing else, so
- * there is no structural alternative here.
+ * there is no structural alternative — but a *fixed* id would quietly cost the
+ * property that made the labels worth writing that way: build the panel twice
+ * and two elements answer to the same name, which is exactly what a DOM test
+ * harness does, and it is invalid markup besides. Counted rather than random so
+ * a failure names the same element on every run.
  */
-const PANEL_ID = "structure-controls";
+let panelsBuilt = 0;
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
@@ -156,9 +160,12 @@ export function createControlPanel(
 		options.runningGrid ??
 		(() => ({ width: settings.gridWidth, height: settings.gridHeight }));
 
+	panelsBuilt += 1;
+	const panelId = `structure-controls-${panelsBuilt}`;
+
 	const element = document.createElement("section");
 	element.className = "panel";
-	element.id = PANEL_ID;
+	element.id = panelId;
 	element.setAttribute("aria-label", "Structure controls");
 
 	/*
@@ -184,7 +191,7 @@ export function createControlPanel(
 	const toggle = document.createElement("button");
 	toggle.type = "button";
 	toggle.className = "panel__toggle";
-	toggle.setAttribute("aria-controls", PANEL_ID);
+	toggle.setAttribute("aria-controls", panelId);
 	toggle.append(createToggleIcon());
 
 	const toggleText = document.createElement("span");
