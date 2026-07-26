@@ -308,12 +308,11 @@ the line that keeps a pattern picker from being an authoring tool.
 
 ### Pattern
 
-- #49 feat: the pattern list grows, and each pattern carries its own explosion rule
-
 A named arrangement of live cells the product ships, offered as a starting point.
 
 | Field | Meaning |
 |-------|---------|
+| `id` | Stable identifier, independent of the pattern's position in the list |
 | `name` | What the Viewer sees in the control |
 | `cells` | The live positions the pattern draws, at age 1 |
 
@@ -323,10 +322,20 @@ inside the product. A pattern is placed toward one corner rather than centred, b
 the entire point.
 
 **A pattern carries the rule it needs, not just the cells it starts with.** Choosing one switches the
-explosion off (see B8), because a pattern that depends on cells which never change state is destroyed by
-the explosion reaching them. That is why a pattern is not a setting: a setting is a value the product
-holds, while a pattern is a description of one run — and the rule that run requires is part of what was
-chosen.
+explosion off (see B8). That is why a pattern is not a setting: a setting is a value the product holds,
+while a pattern is a description of one run — and the rule that run requires is part of what was chosen.
+
+The rule is the same for every pattern, and the reason differs between them. A pattern that depends on
+cells which never change state — a gun, and every oscillator — is destroyed outright by the explosion
+reaching those cells. A pattern that depends on nothing of the kind is unharmed by the explosion but is
+also not helped by it, and would run differently rather than run wrongly.
+
+**One rule for all patterns is therefore a choice rather than a derivation.** It is made so the interface
+stays predictable: a Viewer who learns what choosing a pattern does learns it once, instead of discovering
+that some entries in the list move a control and others do not. The cost is that a self-limiting pattern —
+one that eventually settles into still lifes — becomes a structure that stops changing, which is the state
+the explosion exists to prevent. That is accepted. The viewer sees the interesting part first, the switch
+is visibly off, and turning it back on re-seeds the settled region on the next generation.
 
 Grid dimensions have a floor high enough to hold every pattern shipped, so no pattern can ever be clipped
 and no selection has to be refused.

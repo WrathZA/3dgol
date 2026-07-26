@@ -16,6 +16,15 @@
  */
 
 export interface Pattern {
+	/**
+	 * Stable identifier, independent of position in `PATTERNS`.
+	 *
+	 * Deliberately not the index. An index breaks the first time the list is
+	 * reordered or an entry removed, and it breaks in the worst way — a link
+	 * still resolves, to the wrong Pattern. #50 uses this as a URL parameter, so
+	 * changing an id after release breaks every link already shared.
+	 */
+	readonly id: string;
 	/** What the Viewer sees in the control. */
 	readonly name: string;
 	/** Rows of `#` (alive) and anything else (dead), top row first. */
@@ -45,6 +54,7 @@ export interface Pattern {
  * shuttles that produce a glider on every collision.
  */
 export const GOSPER_GLIDER_GUN: Pattern = {
+	id: "gosper-glider-gun",
 	name: "Gosper's glider gun",
 	rows: [
 		"........................#",
@@ -59,8 +69,175 @@ export const GOSPER_GLIDER_GUN: Pattern = {
 	],
 };
 
-/** Every Pattern the product offers, in the order the control lists them. */
-export const PATTERNS: readonly Pattern[] = [GOSPER_GLIDER_GUN];
+/**
+ * The pulsar — the most common period-3 oscillator, and the most ornate shape
+ * on the list.
+ *
+ * Four-fold symmetric in both axes, so its cross-section reads as a figure
+ * rather than as a smudge, and a three-Generation period means the column
+ * repeats twenty times inside the default Depth Window. The clearest available
+ * demonstration that an oscillator is a *column* with a repeating cross-section,
+ * which is one of the three things the PRD says a flat renderer cannot show.
+ *
+ * 13 × 13, 48 Cells.
+ */
+export const PULSAR: Pattern = {
+	id: "pulsar",
+	name: "Pulsar",
+	rows: [
+		"..###...###",
+		"",
+		"#....#.#....#",
+		"#....#.#....#",
+		"#....#.#....#",
+		"..###...###",
+		"",
+		"..###...###",
+		"#....#.#....#",
+		"#....#.#....#",
+		"#....#.#....#",
+		"",
+		"..###...###",
+	],
+};
+
+/**
+ * The pentadecathlon — period 15, the longest-period small oscillator here.
+ *
+ * Worth its place precisely because of that period. A period-2 or period-3
+ * column repeats too fast to read as anything but texture; fifteen Layers is
+ * slow enough that the braid is legible as a shape while still repeating four
+ * times inside the default Depth Window.
+ *
+ * 10 × 3 at rest, expanding to 10 × 9 through its cycle.
+ */
+export const PENTADECATHLON: Pattern = {
+	id: "pentadecathlon",
+	name: "Pentadecathlon",
+	rows: ["..#....#..", "##.####.##", "..#....#.."],
+};
+
+/**
+ * Kok's galaxy — period 8, and the only oscillator here that visibly rotates.
+ *
+ * Its symmetry is rotational rather than reflective, so successive Layers turn
+ * rather than pulse. Through time that reads as a twisting column, which is a
+ * different shape from anything else on the list.
+ *
+ * 9 × 9 at rest, expanding to 13 × 13 through its cycle — so it needs room
+ * beyond its starting extent, which the Grid floor of 50 provides comfortably.
+ */
+export const KOKS_GALAXY: Pattern = {
+	id: "koks-galaxy",
+	name: "Kok's galaxy",
+	rows: [
+		"######.##",
+		"######.##",
+		".......##",
+		"##.....##",
+		"##.....##",
+		"##.....##",
+		"##.......",
+		"##.######",
+		"##.######",
+	],
+};
+
+/**
+ * The queen bee shuttle — period 30, and the engine inside Gosper's gun.
+ *
+ * A shuttle travelling back and forth between two stationary blocks, which is
+ * what a gun is built from: the gun is two of these arranged so their output
+ * collides into gliders. Alone it emits nothing, so what it offers is the
+ * mechanism rather than the product — a zigzag column, thirty Layers a cycle.
+ *
+ * The blocks at each end are load-bearing. Without them the shuttle destroys
+ * itself; they are the catalysts it reflects off, and they are what makes this
+ * period 30 rather than a brief mess.
+ *
+ * 22 × 7.
+ */
+export const QUEEN_BEE_SHUTTLE: Pattern = {
+	id: "queen-bee-shuttle",
+	name: "Queen bee shuttle",
+	rows: [
+		".........#",
+		".......#.#",
+		"......#.#",
+		"##...#..#...........##",
+		"##....#.#...........##",
+		".......#.#",
+		".........#",
+	],
+};
+
+/**
+ * The R-pentomino — five Cells, and the most famous methuselah in Life.
+ *
+ * The largest gap on this list between what you start with and what you get.
+ * Five Cells produce roughly eleven hundred Generations of chaos on an
+ * unbounded Grid; on a Bounded Edge Grid it collides with the boundary sooner
+ * and settles earlier, but the churn is still enormous relative to the input.
+ *
+ * With the Explosion off — which choosing any Pattern does, see #46 — it
+ * eventually stabilises into still lifes and blinkers, and from that point the
+ * structure is unchanging. That is accepted rather than overlooked: the Viewer
+ * sees the interesting part first, and switching the Explosion back on
+ * re-seeds the settled region on the next Generation.
+ *
+ * 3 × 3, 5 Cells.
+ */
+export const R_PENTOMINO: Pattern = {
+	id: "r-pentomino",
+	name: "R-pentomino",
+	rows: [".##", "##.", ".#."],
+};
+
+/**
+ * The acorn — seven Cells, and a longer fuse than the R-pentomino.
+ *
+ * Runs for several thousand Generations unbounded, and sprawls much further
+ * before settling. On this Grid the Bounded Edge cuts that short, but it fills
+ * the space more completely than anything else here starts to.
+ *
+ * Same caveat as the R-pentomino: with the Explosion off it eventually settles.
+ *
+ * 7 × 3, 7 Cells.
+ */
+export const ACORN: Pattern = {
+	id: "acorn",
+	name: "Acorn",
+	rows: [".#", "...#", "##..###"],
+};
+
+/**
+ * Every Pattern the product offers, in the order the control lists them.
+ *
+ * Ordered by what a Viewer arriving with no context should try first rather
+ * than alphabetically or by size: the gun demonstrates the premise most
+ * directly, the oscillators show the same idea more simply, and the methuselahs
+ * are the ones worth watching once you know what you are looking at.
+ *
+ * Two Patterns were considered and deliberately left out (#49):
+ *
+ * - **A lone spaceship** — a lightweight spaceship travels about forty-eight
+ *   Cells before the Bounded Edge destroys it, and the Grid is then empty and
+ *   stays empty. An empty structure is the one thing this product cannot show,
+ *   and the streak it draws is one the gun already produces.
+ * - **Simkin's glider gun** — period 120 against a default Depth Window of 60,
+ *   so a Viewer at the default would see under half an emission cycle: a mostly
+ *   static blob with an occasional streak, strictly worse than the gun already
+ *   here for anyone who does not know to raise Depth.
+ */
+export const PATTERNS: readonly Pattern[] = [
+	GOSPER_GLIDER_GUN,
+	PULSAR,
+	PENTADECATHLON,
+	KOKS_GALAXY,
+	QUEEN_BEE_SHUTTLE,
+	R_PENTOMINO,
+	ACORN,
+];
 
 /** Columns the Pattern spans — its longest row. */
 export function patternWidth(pattern: Pattern): number {

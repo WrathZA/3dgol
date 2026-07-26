@@ -60,4 +60,36 @@ describe("Pattern data", () => {
 	it("offers at least one Pattern, or the control has nothing to show", () => {
 		expect(PATTERNS.length).toBeGreaterThan(0);
 	});
+
+	it("gives every Pattern a unique id, since a shared link resolves by it", () => {
+		// Two Patterns sharing an id would be indistinguishable to a URL, and the
+		// failure is silent — a link still resolves, to whichever came first. #50
+		// depends on this holding.
+		const ids = PATTERNS.map((pattern) => pattern.id);
+
+		expect(new Set(ids).size).toBe(ids.length);
+	});
+
+	it("keeps ids url-safe and free of anything needing encoding", () => {
+		// An id becomes a query parameter verbatim. Anything requiring escaping
+		// makes a shared link uglier and invites a mismatch between what is written
+		// and what is read back.
+		for (const pattern of PATTERNS) {
+			expect(pattern.id).toMatch(/^[a-z0-9-]+$/);
+		}
+	});
+
+	it("names every Pattern distinctly, so the dropdown is unambiguous", () => {
+		const names = PATTERNS.map((pattern) => pattern.name);
+
+		expect(new Set(names).size).toBe(names.length);
+	});
+
+	it("holds every Pattern the list claims, so none was added without an entry", () => {
+		// Guards the extensibility claim from the other direction: an exported
+		// Pattern that never reached PATTERNS is invisible to the control, and
+		// nothing else would catch it.
+		expect(PATTERNS).toContain(GOSPER_GLIDER_GUN);
+		expect(PATTERNS.length).toBe(7);
+	});
 });
