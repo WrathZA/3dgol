@@ -200,11 +200,13 @@ differently from a long-stable one.
 Age is bounded by the **maximum age A** — the explosion threshold from the rule above. With the explosion
 on, a cell reaching A is thrown back to 1 by its own detonation, so age never exceeds A. With it off
 nothing happens at A and the cell carries on, so age **saturates** there instead: it stops climbing and the
-cell holds at the end of the palette. Either way A is the top of the colour gradient and age never runs
-past it, which is what keeps the gradient's far end meaningful rather than shared by every long-lived cell.
+cell holds at the end of the palette.
 
 Saturation is why `age` is not strictly "consecutive generations alive" — a cell held at A has survived
-longer than its age says. That is deliberate: the alternative leaves the gradient's top end undefined.
+longer than its age says. That is deliberate, and the honest reason is that it keeps the quantity bounded
+and its meaning defined, not that it improves the picture. With the explosion off, long-lived cells
+accumulate on the final colour and a settled structure trends toward one hue — the same complaint the
+gradient already attracts at a high A, and the cost of choosing to switch the mechanism off.
 
 A cell traverses the full palette exactly once and detonates as it arrives at the final colour, so colour
 and lifespan are the same quantity expressed two ways, which is why they are deliberately not independent

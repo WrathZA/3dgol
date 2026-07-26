@@ -117,12 +117,17 @@ export interface StructureMesh {
 const DEFAULT_CELL_SIZE = 0.55;
 
 /**
- * The Colour Gradient, birth on the left, death on the right.
+ * The Colour Gradient, birth on the left, detonation on the right.
  *
- * A Cell traverses this exactly once over its lifetime, so the palette is a
- * countdown rather than decoration — the colour of a region tells you how long
- * it has left, and a churning area reads differently from a settled one at a
- * glance.
+ * A Cell traverses this exactly once on its way to Maximum Age, so the palette
+ * is a countdown rather than decoration — the colour of a region tells you how
+ * long it has left, and a churning area reads differently from a settled one at
+ * a glance.
+ *
+ * The far end is where a Cell explodes, not where it dies. With the Explosion
+ * switched off nothing happens there at all and Ages saturate, so long-lived
+ * Cells accumulate on the final stop and the structure trends toward one colour
+ * — a known consequence, tracked on #28.
  *
  * Chosen to run cool-to-hot and to stay vivid against a dark background. The
  * ends are deliberately far apart in hue *and* brightness: a viewer should be
@@ -134,7 +139,7 @@ const GRADIENT_STOPS = [
 	0x5cc8ff, // settling in
 	0x9a8cff, // middle age — indigo
 	0xd873f5, // violet
-	0xff6b86, // death — hot pink
+	0xff6b86, // detonation — hot pink
 ] as const;
 
 /**
