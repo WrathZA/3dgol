@@ -492,7 +492,9 @@ invisible panel, a stuck translate is a panel overlapping the control that dismi
 in that order. Before adding motion back, confirm the transition actually starts on a device under load.
 
 **The sheet is a flex column, so its children need `flex-shrink: 0`.** Content taller than the sheet makes
-every child a shrink candidate; the dismiss control collapsed from 44px to the 16px of its icon.
+every child a shrink candidate. Found when a 44px button collapsed to the 16px of its icon — that button has
+since been removed, but the rule still guards every remaining child, and landscape still overflows the
+sheet, so the condition that triggers it is live.
 
 **Nothing here uses `position: fixed`, and that is the whole of #37.** A fixed element resolves against the
 *layout* viewport, which on iOS Safari is the **large** viewport — the page as it would be with the browser
