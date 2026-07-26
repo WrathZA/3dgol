@@ -7,6 +7,10 @@ import {
 	type SettingBound,
 	type Settings,
 } from "@/settings";
+import { createSignatureMark } from "@/ui/signature";
+
+/** Where the mark points. The product's only outbound link. */
+const AUTHOR_PROFILE = "https://github.com/WrathZA";
 
 /**
  * The control surface: the settings the Viewer can move, and the Restart button.
@@ -254,6 +258,26 @@ export function createControlPanel(
 	note.className = "panel__note";
 	note.textContent = "Drag to orbit · scroll to zoom · right-drag to pan";
 	element.append(note);
+
+	// The author's mark, and the only way out of the product.
+	//
+	// A new tab rather than the current one: History is a window, not an archive
+	// — the Stack holds at most N Layers and everything past that is gone. A
+	// Viewer who navigates away and comes back does not resume, they restart from
+	// a fresh Seed, and the Run they were watching is unrecoverable. `noopener`
+	// also denies the opened page a handle on this one, which `noreferrer` alone
+	// would not.
+	const signature = document.createElement("a");
+	signature.className = "panel__signature";
+	signature.href = AUTHOR_PROFILE;
+	signature.target = "_blank";
+	signature.rel = "noopener noreferrer";
+	// The drawing is `aria-hidden`, so this is the link's entire accessible name.
+	// It says whose profile and where, because "GitHub" alone tells a screen
+	// reader user nothing about where the one outbound link goes.
+	signature.setAttribute("aria-label", "Built by WrathZA — profile on GitHub");
+	signature.append(createSignatureMark());
+	element.append(signature);
 
 	parent.append(element);
 

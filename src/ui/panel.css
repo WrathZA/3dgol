@@ -241,3 +241,61 @@
 	line-height: 1.45;
 	color: rgb(205 214 228 / 42%);
 }
+
+/*
+ * The author's mark.
+ *
+ * A block rather than an inline link so the hit area is the full width of the
+ * panel: the drawing is 3rem tall and only about 2.4rem wide, which is under the
+ * 44px minimum on its short side, and a thumb aiming at a small drawing in the
+ * corner of a phone should not have to be accurate. The rule above it separates
+ * the signature from the controls without adding another visible element —
+ * it is the same hairline the controls use between themselves.
+ */
+.panel__signature {
+	display: flex;
+	justify-content: center;
+	margin-top: 0.9rem;
+	padding-top: 0.85rem;
+	border-top: 1px solid rgb(205 214 228 / 8%);
+
+	/* Dim at rest. The mark is a signature, not a control — it should be findable
+	 * without competing with the thing the Viewer came to look at. */
+	color: rgb(205 214 228 / 34%);
+	transition: color 160ms ease-out;
+}
+
+.panel__signature:hover,
+.panel__signature:focus-visible {
+	color: #cdd6e4;
+}
+
+.panel__signature:focus-visible {
+	outline: none;
+	border-radius: 0.35rem;
+	box-shadow: 0 0 0 0.2rem rgb(126 249 232 / 22%);
+}
+
+.panel__signature-mark {
+	display: block;
+	height: 3rem;
+	/* The viewBox is 27.4 × 40, so the width follows from the height. Fixing only
+	 * one dimension keeps the drawing from stretching if the box ever changes. */
+	width: auto;
+
+	/* Filled, not stroked. Hairlines matched the panel's rules but dissolved into
+	 * an unreadable glyph at 3rem; a silhouette is what survives being small. */
+	fill: currentColor;
+	stroke: none;
+}
+
+/*
+ * The apple is the only filled shape and the only colour, because it is the only
+ * part of the drawing that has to be read as an apple rather than a head. It
+ * stays at full strength while the strokes are dimmed, so the mark still reads
+ * at rest.
+ */
+.panel__signature-apple {
+	fill: #7ef9e8;
+	stroke: none;
+}
