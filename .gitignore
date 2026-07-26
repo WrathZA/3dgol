@@ -4,6 +4,11 @@ dist/
 *.local
 .DS_Store
 
+# Operator scratch. Findings written here for copying into zalwa's own notes —
+# deliberately outside the repo's history, because they are about the zalwa
+# system rather than about this product.
+sandbox.txt
+
 # Reference material only — never shipped, never committed.
 #
 # The author's mark (see the PRD's Author credit) is an original drawing of the
