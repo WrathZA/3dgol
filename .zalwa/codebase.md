@@ -10,11 +10,15 @@ walk around, adjust, resize, and start over.
 Issue #3 scaffolded the project and proved the deployment path. #4 built the simulation, #5 the bounded
 history window, #6 drew it, #8 gave it colour, fade, and cubic edge-drawn cells, #7 made it something you
 can walk around, #9 gave it a control panel for Speed, Depth Window, Maximum Age, and Cell Size, #10
-added staged Grid dimensions and Restart, and #26 made Death by Old Age detonate.
+added staged Grid dimensions and Restart, #26 made Death by Old Age detonate, and #32 signed the panel.
 
 Not yet built: phone layout (#11), the drawing budget (#12), and link previews (#13). The panel's layout is
 desktop-shaped — it scrolls rather than fits on a short viewport — and the instance ceiling it permits has
 never been measured. Both deliberate, and owned by those issues.
+
+Queued behind those: the Colour Gradient reads near-monochrome at the A=200 default (#28), Speed's default
+moves to 15 (#29), the Explosion gains an off switch (#30), and the Grid ceiling rises to 128 (#31, blocked
+on #12).
 
 What is built:
 
@@ -57,6 +61,7 @@ src/
   ui/                 Control surface — mutates settings, knows nothing else
     panel.ts          Six controls plus Restart, built from native range inputs
     panel.css         Panel styling, including the viewport height bound
+    signature.ts      The author's mark — original SVG, links out to GitHub
 e2e/
   smoke.mjs           Headless render + screenshot — local only, never CI
 tests/
@@ -426,6 +431,41 @@ anything past the bottom of the viewport is unreachable — there is no page to 
 button it exceeds a short window, and the control that fell off the end was Restart. Adding a seventh control
 without checking a short viewport reintroduces that, and nothing automated guards it.
 
+Note for anything positioning inside the panel: **`backdrop-filter` makes `.panel` a containing block for
+`position: fixed` descendants.** A fixed child does not escape to the viewport, it anchors to the panel.
+This cost a confusing debugging round during #32.
+
+### `src/ui/signature.ts`
+
+The author's mark — a bowler-hatted figure with an apple where the face is — and the product's only
+outbound link (#32, PRD B13).
+
+**Original geometry, and it has to stay that way.** Magritte's *The Son of Man* is under copyright until
+2038 and licensed through SABAM/ADAGP. The composition and the joke are not protected; his rendering of
+them is. So this is four filled paths and a circle. Replacing it with a trace, a filter, or a
+background-removed reproduction would look closer and be infringing. `assets/` is gitignored to keep the
+reference painting out of the repo.
+
+**Filled silhouettes, not monoline strokes.** The first version used hairlines to match the panel's rules
+and read as an arch over a dot over a bracket at 3rem. Solid shapes survive being shrunk; thin outlines do
+not. The lesson worth keeping: a 48px screenshot cannot be used to judge 48px artwork — the mark had to be
+blown up to 22rem before the wrong shapes were visible, and every `getBoundingClientRect` assertion passed
+against the illegible draft.
+
+Built with `createElementNS`, never `innerHTML`. Nothing here is Viewer-supplied, so this defends against
+nothing today — it keeps the one place this codebase writes markup free of an HTML parser, so it cannot
+acquire one by someone later interpolating into a template literal.
+
+Geometry lives here; colour lives in `panel.css` via `currentColor` and the `panel__signature-apple` class,
+so hover and focus are one CSS property rather than a redraw.
+
+**The link opens in a new tab, and that is a product requirement.** History is a window, not an archive —
+navigating away discards the Run and the back button returns a fresh Seed, not the structure the Viewer was
+watching. `rel="noopener noreferrer"`: `noopener` is what denies the opened page a handle back into this
+one, which `noreferrer` alone does not do.
+
+Exposes: `createSignatureMark`.
+
 ## Known risks
 
 - **The instance cap has no number, and the panel now permits four times what has ever shipped.** Defaults
@@ -461,6 +501,10 @@ without checking a short viewport reintroduces that, and nothing automated guard
   read exactly like a rendering bug. It was SwiftShader's GPU process dying under repeated captures — the
   same sequence with four captures reported an empty error log throughout. Check the console error list
   before believing a blank frame.
+  Second instance, #32: repeated Playwright **locator** resolution hung for its full timeout even after
+  `waitForSelector` on the same selector had already succeeded — reproducibly, three runs in a row.
+  Collapsing every read into a single `page.evaluate` fixed it outright. Prefer one `page.evaluate` over a
+  sequence of locator calls when scripting this project headlessly.
 
 - **Screen-space effects need checking across the whole camera range.** The edge rim was correct at the
   fixed distance #6 and #8 could reach and wrong once #7 allowed zooming out. Anything using `fwidth` or
