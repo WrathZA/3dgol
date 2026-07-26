@@ -133,7 +133,8 @@ Applied immediately, without disturbing the run in progress:
 Chosen per run, applied immediately by starting one:
 
 - **Starting pattern** — which named arrangement generation 0 holds, or a random seed. Selecting one starts
-  a fresh run; it does not alter the run in progress.
+  a fresh run, and switches the explosion off as part of doing so (see B8). It is the only control that
+  moves another.
 
 Applied on restart:
 
@@ -313,6 +314,12 @@ inside the product. A pattern is placed toward one corner rather than centred, b
 *emits* needs somewhere to travel before the bounded edge destroys it — and for a glider gun that travel is
 the entire point.
 
+**A pattern carries the rule it needs, not just the cells it starts with.** Choosing one switches the
+explosion off (see B8), because a pattern that depends on cells which never change state is destroyed by
+the explosion reaching them. That is why a pattern is not a setting: a setting is a value the product
+holds, while a pattern is a description of one run — and the rule that run requires is part of what was
+chosen.
+
 Grid dimensions have a floor high enough to hold every pattern shipped, so no pattern can ever be clipped
 and no selection has to be refused.
 
@@ -399,15 +406,33 @@ interface indicates the new dimensions apply on restart. On restart (B8), the ne
 
 ### B8 — Start a fresh run
 
-- #46 feat: choosing a pattern switches the explosion off
-
 The Viewer presses **Random** → the stack clears, the generation counter returns to 0, the grid reseeds
 randomly, and layers begin accumulating again from an empty space using the currently configured
-dimensions.
+dimensions. Random changes nothing else — in particular it does not touch the explosion switch.
 
-The Viewer chooses a **pattern** → exactly the same thing happens, except that generation 0 holds that
-pattern and nothing else. Choosing the same pattern a second time starts it again rather than doing
-nothing, so a pattern can be watched from the beginning as often as the Viewer likes.
+The Viewer chooses a **pattern** → the same thing happens, except that generation 0 holds that pattern and
+nothing else, **and the explosion is switched off**. The switch visibly moves to off, because an interface
+that showed a rule the run was not using would be lying. Choosing the same pattern a second time starts it
+again rather than doing nothing, so a pattern can be watched from the beginning as often as the Viewer
+likes.
+
+A pattern switches the explosion off because most patterns worth shipping depend on cells that never
+change state, and those cells reach A. Gosper's glider gun rests on four of them: with the explosion on it
+runs perfectly for about two hundred generations — twenty seconds at the default speed — and then blows
+itself apart. A Viewer who chose the gun and watched it dismantle would reasonably conclude the product is
+broken rather than that they had seen a rule.
+
+**The switch stays live, so this is a starting point rather than a lock.** A Viewer who wants the gun to
+detonate on schedule switches the explosion back on and watches it happen; that is its own thing worth
+seeing, and B12a describes what they see.
+
+**Random does not switch the explosion back on, and the consequence is accepted rather than mitigated.** A
+Viewer who tries a pattern and then presses Random gets a random seed with the explosion still off — plain
+Conway, decaying into still lifes and unchanging vertical stripes within a few hundred generations, which
+is the state the explosion exists to prevent. Nothing warns them. The alternative, Random restoring the
+explosion, was rejected because it would reset the control every time a pattern was re-selected and take
+away the detonating reading entirely. Losing that is worse than the decay, which the Viewer can undo with
+one movement of a switch they can see is off.
 
 Both paths are restarts in every sense that matters: staged grid dimensions apply, the stack empties, and
 the counter returns to 0. Only the contents of generation 0 differ. The behaviour is named for starting a
@@ -468,6 +493,14 @@ was.
 
 This is the one control that changes which rule is running rather than a quantity within it, which is why
 it is a switch rather than a slider, and why it defaults on.
+
+It is also the only control that something else moves. Choosing a pattern switches it off (see B8), and
+that is a deliberate exception to every control being independent rather than the start of a habit. The
+justification is specific and does not generalise: a pattern is a description of one run rather than a
+value the product holds, so the rule that run needs is part of what the Viewer chose. **A control that
+moves another needs a reason of that kind.** Anything less and the interface stops being predictable —
+a Viewer has to remember which settings are really theirs, and the panel stops being a statement of what
+is currently true.
 
 ### B13 — Find who made it
 
