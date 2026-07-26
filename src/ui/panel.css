@@ -500,6 +500,66 @@
 }
 
 /*
+ * Fingers.
+ *
+ * Keyed on pointer type rather than on viewport size, because the two are not
+ * the same question and get different answers: a tablet is wide enough for the
+ * desktop arrangement and is still operated by thumb, while a narrow desktop
+ * window is small and still has a mouse. Sizing targets by width would leave the
+ * first of those with 20px sliders.
+ *
+ * The numbers are all 2.75rem — 44px, the smallest target a finger hits reliably
+ * — and they are applied to the *hit* area only. The slider's visible track stays
+ * 2px and the thumb stays where it is: growing what is drawn would coarsen the
+ * panel on every touch device to solve a problem that is about where a tap lands,
+ * not about what it looks like.
+ */
+@media (pointer: coarse) {
+	.panel__slider {
+		height: 2.75rem;
+	}
+
+	/* The thumb is centred on the track by a negative margin, so its offset has to
+	 * follow the taller input or the thumb floats away from the line it rides. */
+	.panel__slider::-webkit-slider-thumb {
+		width: 1.1rem;
+		height: 1.1rem;
+		margin-top: -0.5rem;
+	}
+
+	.panel__slider::-moz-range-thumb {
+		width: 1.1rem;
+		height: 1.1rem;
+	}
+
+	.panel__restart {
+		min-height: 2.75rem;
+	}
+
+	.panel__toggle {
+		min-height: 2.75rem;
+	}
+
+	.panel__close {
+		width: 2.75rem;
+		height: 2.75rem;
+		/* Pulled into the panel's own padding so a target this size does not push
+		 * the first control down a row it does not need. */
+		margin: -0.35rem -0.35rem -0.9rem 0;
+	}
+
+	/*
+	 * Separation, not just size. Two 44px targets touching are one 88px target
+	 * that does the wrong thing half the time, and the sliders here sit in a
+	 * single column with nothing but a hairline between them.
+	 */
+	.panel__control + .panel__control {
+		margin-top: 1.15rem;
+		padding-top: 1.15rem;
+	}
+}
+
+/*
  * Motion is a courtesy, not a requirement. The sheet still appears and still
  * dismisses; it simply stops sliding.
  */
