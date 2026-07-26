@@ -19,11 +19,49 @@
  * so the breakpoint exists in one place and a rotation needs no listener.
  */
 
-.panel {
+/*
+ * The layer both controls live in.
+ *
+ * Everything below positions against this rather than against the viewport, and
+ * that is the whole point. `position: fixed` resolves against the *layout*
+ * viewport, which on iOS Safari is the large one — the page as it would be with
+ * the browser toolbar collapsed — so a control pinned to `bottom` sits behind the
+ * toolbar. This shipped: the toggle was unreachable on a real iPhone while
+ * headless Chromium, which has no toolbar, measured it comfortably on screen.
+ *
+ * The layer is `100dvh`, which tracks what is actually visible, so "the bottom"
+ * inside it means the bottom of what the Viewer can see. Padding carries the
+ * safe-area insets — absolutely positioned children resolve against the padding
+ * box, so one declaration keeps both controls clear of the home indicator.
+ *
+ * `pointer-events: none` is load-bearing, not tidiness. The layer covers the
+ * whole viewport; without it every orbit, pan, and pinch would land here instead
+ * of on the camera, and navigation would simply stop working.
+ */
+.panel-layer {
 	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 1;
+
+	width: 100%;
+	height: 100dvh;
+
+	box-sizing: border-box;
+	padding: env(safe-area-inset-top) env(safe-area-inset-right)
+		env(safe-area-inset-bottom) env(safe-area-inset-left);
+
+	pointer-events: none;
+}
+
+.panel {
+	position: absolute;
 	top: 1.25rem;
 	right: 1.25rem;
-	z-index: 1;
+
+	/* The layer does not take pointer events; its children have to take their
+	 * own back. */
+	pointer-events: auto;
 
 	width: 15rem;
 	padding: 1rem 1.1rem 1.15rem;
@@ -79,14 +117,11 @@
 }
 
 /*
- * The toggle, and the close control inside the sheet.
- *
- * Both are desktop-invisible: the panel is simply present there, so there is
- * nothing to reveal and nothing to dismiss. `display: none` rather than opacity
- * so neither is reachable by keyboard on a viewport where it would do nothing.
+ * The toggle is desktop-invisible: the panel is simply present there, so there
+ * is nothing to reveal. `display: none` rather than opacity so it is not
+ * reachable by keyboard on a viewport where pressing it would do nothing.
  */
-.panel__toggle,
-.panel__close {
+.panel__toggle {
 	display: none;
 }
 
@@ -367,10 +402,13 @@
  * the small-viewport block below; everything else is defined once, here.
  */
 .panel__toggle {
-	position: fixed;
+	/* Absolute within `.panel-layer`, so `bottom` is the bottom of the *visible*
+	 * viewport rather than of one a browser toolbar is covering. */
+	position: absolute;
 	right: 0.75rem;
 	bottom: 0.75rem;
 	z-index: 2;
+	pointer-events: auto;
 
 	align-items: center;
 	gap: 0.45rem;
@@ -422,41 +460,6 @@
 .panel__toggle-thumb {
 	fill: #7ef9e8;
 	stroke: none;
-}
-
-.panel__close {
-	/* Sticky rather than absolute: the sheet scrolls inside itself, and a dismiss
-	 * control that scrolls away is one the Viewer has to scroll back up to find. */
-	position: sticky;
-	top: 0;
-	z-index: 1;
-
-	align-items: center;
-	justify-content: center;
-	width: 1.9rem;
-	height: 1.9rem;
-	padding: 0;
-
-	color: rgb(205 214 228 / 62%);
-	background: transparent;
-	border: 0;
-	border-radius: 0.35rem;
-	cursor: pointer;
-}
-
-.panel__close:focus-visible {
-	outline: none;
-	box-shadow: 0 0 0 0.2rem rgb(126 249 232 / 22%);
-}
-
-.panel__close-icon {
-	display: block;
-	width: 1rem;
-	height: 1rem;
-	fill: none;
-	stroke: currentColor;
-	stroke-width: 1.5;
-	stroke-linecap: round;
 }
 
 /*
@@ -554,15 +557,6 @@
 	.panel__toggle {
 		display: inline-flex;
 	}
-
-	.panel__close {
-		display: flex;
-		/* First in the flex order despite following the title in the DOM, where it
-		 * belongs to the panel rather than to the heading. */
-		order: -1;
-		align-self: flex-end;
-		margin-bottom: -0.5rem;
-	}
 }
 
 /*
@@ -604,14 +598,6 @@
 
 	.panel__toggle {
 		min-height: 2.75rem;
-	}
-
-	.panel__close {
-		width: 2.75rem;
-		height: 2.75rem;
-		/* Pulled into the panel's own padding so a target this size does not push
-		 * the first control down a row it does not need. */
-		margin: -0.35rem -0.35rem -0.9rem 0;
 	}
 
 	/*
