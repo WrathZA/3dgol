@@ -317,6 +317,13 @@ export function createControlPanel(
 
 			const readout = document.createElement("span");
 			readout.className = "panel__value";
+			// Hidden from the accessibility tree, and the label is why. It wraps both
+			// this and the name, so anything readable here joins the checkbox's
+			// accessible name — which would make it "Explosion On", a name that
+			// changes as the control is used while the checkbox's own checked state
+			// already says the same thing. The same reasoning as the panel toggle's
+			// aria-label: state belongs in the state, not in the name.
+			readout.setAttribute("aria-hidden", "true");
 
 			const input = document.createElement("input");
 			input.type = "checkbox";
