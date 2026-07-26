@@ -24,8 +24,6 @@ Concretely, a person watching a 2D Game of Life today cannot:
 
 ## Solution and Scope
 
-- #32 feat: sign the panel with a link to the author's GitHub
-
 A browser-based viewer that runs a 2-dimensional Game of Life and renders its history as a 3-dimensional
 structure. The third axis is **time, not space**: each computed generation is laid down as a horizontal
 layer, and successive generations stack upward. The viewer flies around the accumulated structure while
@@ -124,6 +122,24 @@ Applied on restart:
 The viewer is not locked to a fixed camera. They can fly around the structure freely while it is building —
 orbiting it, viewing it from above, below, or side-on — and zoom in and out to move between the whole
 silhouette and individual cells.
+
+### Author credit
+
+The product is signed. A small mark sits at the bottom of the controls and links to the author's GitHub
+profile — **the only outbound link in the product**, and the only place its author is present.
+
+The mark is a bowler-hatted figure with an apple where the face is: an original drawing of the idea behind
+Magritte's *The Son of Man*, not a reproduction of the painting. The painting is under copyright until 2038.
+The joke and the composition are not protected; his rendering of them is. Any future version of the mark is
+held to the same line — no trace, no filter, no background-removed reproduction, however much closer it
+would look.
+
+It opens in a new tab, and that is not a detail. History is a window rather than an archive: navigating away
+discards the run, and a Viewer returning by the back button gets a new random seed rather than the structure
+they were looking at. A link that quietly destroys what the Viewer came to see would be a defect.
+
+This is a signature, not a role. Nobody gains an ability the Viewer does not already have, and the Actors
+section below remains a list of one.
 
 ## Actors
 
@@ -361,6 +377,18 @@ Viewer can tell the two kinds of death apart by watching: one is a disappearance
 At the default A the first burst is some way into a run — the Viewer watching from the start sees the
 structure build and thin for a while before anything detonates. Lowering A brings the bursts forward and
 makes them frequent.
+
+### B13 — Find who made it
+
+At the bottom of the controls the Viewer sees a small bowler-hatted figure with an apple for a face.
+Activating it — by pointer or by touch — opens the author's GitHub profile in a new tab, and the run
+carries on undisturbed in the tab behind it.
+
+The mark is dim at rest and brightens on hover and on keyboard focus, so it is findable without competing
+with the structure. It is reachable by keyboard, and a screen reader announces where it goes rather than
+merely that there is a link.
+
+This is the only way out of the product. Everything else the Viewer can do keeps them inside it.
 
 ## Out of Scope (v1)
 
