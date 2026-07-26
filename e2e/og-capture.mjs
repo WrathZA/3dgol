@@ -70,6 +70,23 @@ await page.goto(url, { waitUntil: "load" });
 await page.waitForTimeout(waitMs);
 
 /*
+ * One scroll back, because the arrival framing is not a card.
+ *
+ * The camera starts aimed at the middle of the Stack's height and angled down
+ * from above, which puts the near bottom edge of the Structure well below the
+ * point being looked at. That is right in a full window and wrong in a 630px
+ * one: the Structure runs off the bottom of the frame while a third of the top
+ * stays empty. Dollying back is the same movement a Viewer makes with a scroll
+ * wheel, so the frame stays a real one rather than a staged camera the product
+ * never uses.
+ */
+const DOLLY_BACK = 220;
+await page.mouse.move(WIDTH / 2, HEIGHT / 2);
+await page.mouse.wheel(0, DOLLY_BACK);
+// The controls damp, so the move arrives over several frames rather than at once.
+await page.waitForTimeout(1_000);
+
+/*
  * The controls come off, and the Structure does not.
  *
  * The card is an argument for opening the page, and a stack of sliders is not
