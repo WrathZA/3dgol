@@ -186,7 +186,7 @@ export function createControlPanel(
 	 * A sibling of the panel rather than a child, and that is not arbitrary:
 	 * `backdrop-filter` makes `.panel` a containing block, so a `position: fixed`
 	 * child anchors to the panel instead of the viewport and travels with it out
-	 * of view.
+	 * of view. Both sit inside the layer built below.
 	 */
 	const toggle = document.createElement("button");
 	toggle.type = "button";
@@ -224,25 +224,15 @@ export function createControlPanel(
 	element.append(title);
 
 	/*
-	 * Dismissal from inside the sheet.
+	 * There is deliberately no close button inside the sheet.
 	 *
-	 * The toggle closes it too, but the toggle sits behind an open sheet on a
-	 * phone, so closing would mean reaching past the thing being closed. Hidden on
-	 * a desktop, where there is nothing to dismiss.
+	 * One was written, on the reasoning that the toggle would sit behind an open
+	 * sheet and dismissing would mean reaching past the thing being dismissed.
+	 * Anchoring the sheet *above* the toggle made that false — the toggle stays
+	 * visible and reads "Hide" while the sheet is open — so the close control was
+	 * a second way to do what the toggle already does, and it cost 44px of height
+	 * on the viewport with the least of it to spare.
 	 */
-	const close = document.createElement("button");
-	close.type = "button";
-	close.className = "panel__close";
-	close.setAttribute("aria-label", "Hide controls");
-	close.append(createCloseIcon());
-	close.addEventListener("click", () => {
-		setOpen(false);
-		// Focus goes back to the control that opened the sheet. Left on a button
-		// that has just been hidden, the focus ring lands nowhere and a keyboard
-		// Viewer has to tab from the top of the document to find their place.
-		toggle.focus();
-	});
-	element.append(close);
 
 	const dismissOnEscape = (event: KeyboardEvent): void => {
 		if (event.key === "Escape" && open) {
@@ -411,7 +401,31 @@ export function createControlPanel(
 	signature.append(createSignatureMark());
 	element.append(signature);
 
-	parent.append(element, toggle);
+	/*
+	 * The layer both controls live in, and the reason it exists.
+	 *
+	 * `position: fixed` resolves against the *layout* viewport. On iOS Safari that
+	 * is the large viewport — the page as it would be with the browser toolbar
+	 * collapsed — so a control pinned to `bottom: 0.75rem` sits behind the toolbar
+	 * and is simply not there. This shipped, and the toggle was unreachable on a
+	 * real iPhone while headless Chromium, which has no toolbar, measured it
+	 * comfortably on screen.
+	 *
+	 * The layer is fixed and exactly `100dvh` tall, and the panel and toggle are
+	 * positioned inside it. `dvh` tracks what is actually visible, so "the bottom"
+	 * becomes the bottom of what the Viewer can see rather than the bottom of a
+	 * viewport the toolbar is covering. It also carries the safe-area insets, so
+	 * nothing lands under the home indicator.
+	 *
+	 * `pointer-events: none` on the layer is load-bearing: it spans the whole
+	 * viewport, and without it every orbit, pan, and pinch would land on the layer
+	 * instead of the camera. The two controls re-enable pointer events for
+	 * themselves.
+	 */
+	const layer = document.createElement("div");
+	layer.className = "panel-layer";
+	layer.append(element, toggle);
+	parent.append(layer);
 
 	// Closed is the starting state, and the class the stylesheet keys off has to
 	// exist from the first paint rather than after the first tap.
@@ -428,8 +442,7 @@ export function createControlPanel(
 		},
 		dispose: () => {
 			document.removeEventListener("keydown", dismissOnEscape);
-			element.remove();
-			toggle.remove();
+			layer.remove();
 		},
 	};
 }
@@ -474,28 +487,6 @@ function createToggleIcon(): SVGSVGElement {
 		thumb.setAttribute("r", "2");
 		thumb.classList.add("panel__toggle-thumb");
 		svg.append(thumb);
-	}
-
-	return svg;
-}
-
-/** A cross, for dismissing the sheet. */
-function createCloseIcon(): SVGSVGElement {
-	const svg = document.createElementNS(SVG_NAMESPACE, "svg");
-	svg.setAttribute("viewBox", "0 0 16 16");
-	svg.setAttribute("aria-hidden", "true");
-	svg.classList.add("panel__close-icon");
-
-	for (const [x1, y1, x2, y2] of [
-		[4.5, 4.5, 11.5, 11.5],
-		[11.5, 4.5, 4.5, 11.5],
-	] as const) {
-		const stroke = document.createElementNS(SVG_NAMESPACE, "line");
-		stroke.setAttribute("x1", String(x1));
-		stroke.setAttribute("y1", String(y1));
-		stroke.setAttribute("x2", String(x2));
-		stroke.setAttribute("y2", String(y2));
-		svg.append(stroke);
 	}
 
 	return svg;
