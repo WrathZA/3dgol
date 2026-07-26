@@ -26,9 +26,10 @@ export const CELL_SPACING = 1;
  * World units between adjacent Layers.
  *
  * Equal to `CELL_SPACING`, making the lattice isotropic: a Cell is a cube and
- * the gap above it matches the gap beside it. How much of this distance a drawn
- * Cell occupies is Cell Size, which the Viewer controls — below 1 the Layers
- * read as separate strata, and at 1 they fuse into one solid mass.
+ * the gap above it matches the gap beside it. A drawn Cell occupies the whole
+ * of that distance, so neighbouring live Cells touch in every direction. At the
+ * populations this Grid actually reaches — a few per cent live — that produces
+ * chunky connected clusters rather than filled Layers.
  *
  * The Stack ends up taller than it is wide at the default Depth Window. That is
  * fine — the camera frames from the structure's extent, so it follows.

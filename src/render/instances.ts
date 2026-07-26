@@ -35,8 +35,6 @@ export interface StructureMeshOptions {
 	depthWindow: number;
 	/** Age at which a Cell dies — the far end of the Colour Gradient. */
 	maximumAge: number;
-	/** Edge length of a drawn Cell, as a fraction of `CELL_SPACING`. */
-	cellSize?: number;
 	/**
 	 * Ring slots to allocate, which must be at least `depthWindow`.
 	 *
@@ -61,8 +59,6 @@ export interface StructureMesh {
 	setFrameState(currentGeneration: number, layerCount: number): void;
 	/** Retargets the Colour Gradient when Maximum Age changes. */
 	setMaximumAge(maximumAge: number): void;
-	/** Resizes drawn Cells, between a porous scatter and solid sheets. */
-	setCellSize(cellSize: number): void;
 	/**
 	 * Sets the window the shader fades and cuts off against.
 	 *
@@ -99,22 +95,6 @@ export interface StructureMesh {
 	uploadAll(): void;
 	dispose(): void;
 }
-
-/**
- * Edge length of a drawn Cell, as a fraction of the lattice spacing.
- *
- * A Cell is a cube on an isotropic lattice, so this one number sets the gap in
- * every direction at once. It is the most consequential value in the codebase:
- * near 1, Cells touch and the Stack fuses into a solid mass — history becomes
- * invisible, which is the one thing this product exists to show. Around half,
- * each Generation reads as its own stratum and you can see into the structure.
- *
- * Now a Viewer control, so the Cell is built as a unit cube and this scales it
- * in the vertex shader. Rebuilding the geometry on each change would allocate
- * on a slider drag, and the whole design exists to avoid allocating while the
- * product is animating.
- */
-const DEFAULT_CELL_SIZE = 0.55;
 
 /**
  * The Colour Gradient, birth on the left, detonation on the right.
@@ -276,7 +256,6 @@ export function createStructureMesh(
 	const currentGenerationUniform = { value: 0 };
 	const layerCountUniform = { value: 0 };
 	const maximumAgeUniform = { value: options.maximumAge };
-	const cellSizeUniform = { value: options.cellSize ?? DEFAULT_CELL_SIZE };
 	const depthWindowUniform = { value: depthWindow };
 
 	const material = new ShaderMaterial({
@@ -284,7 +263,6 @@ export function createStructureMesh(
 			uCurrentGeneration: currentGenerationUniform,
 			uLayerCount: layerCountUniform,
 			uMaximumAge: maximumAgeUniform,
-			uCellSize: cellSizeUniform,
 			uDepthWindow: depthWindowUniform,
 			uLayerSpacing: { value: LAYER_SPACING },
 			uGradient: { value: GRADIENT_STOPS.map((hex) => new Color(hex)) },
@@ -340,10 +318,6 @@ export function createStructureMesh(
 
 		setMaximumAge(maximumAge) {
 			maximumAgeUniform.value = maximumAge;
-		},
-
-		setCellSize(cellSize) {
-			cellSizeUniform.value = cellSize;
 		},
 
 		setDepthWindow(nextDepthWindow) {
@@ -404,7 +378,6 @@ attribute float aAge;
 uniform float uCurrentGeneration;
 uniform float uLayerCount;
 uniform float uMaximumAge;
-uniform float uCellSize;
 uniform float uDepthWindow;
 uniform float uLayerSpacing;
 
@@ -448,10 +421,12 @@ void main() {
 	// by the time a slot is recycled its Cells have already shrunk away.
 	float shrink = 1.0 - smoothstep(FADE_START, 1.0, sunk);
 
-	// The Cell is a unit cube here and Cell Size scales it, so the Viewer moves
-	// between a porous scatter and touching sheets without any geometry being
-	// rebuilt. Dead Cells and retired Layers collapse to nothing the same way.
-	vec3 placed = position * uCellSize * (visible ? shrink : 0.0)
+	// The Cell is built at the full lattice spacing, so neighbouring live Cells
+	// touch and there is no size factor to apply. What remains here is the two
+	// ways a Cell is made to vanish: dead Cells and retired Layers collapse to
+	// nothing rather than being skipped, because fixed ring slots are what make
+	// the indexing work.
+	vec3 placed = position * (visible ? shrink : 0.0)
 		+ vec3(aGridPosition.x, y, aGridPosition.y);
 
 	vNormal = normal;
