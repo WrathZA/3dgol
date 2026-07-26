@@ -208,9 +208,13 @@ function restartRun(pattern: Pattern | null): void {
 		run.accumulated = 0;
 	}
 
-	// The staged dimensions are the running ones now, so the panel's pending marks
-	// have to clear — including on the path where nothing about them changed, since
-	// the Viewer may have moved a slider and moved it back.
+	// Re-reads every control, and two things depend on it rather than one. The
+	// staged dimensions are the running ones now, so the pending marks have to
+	// clear — including on the path where nothing about them changed, since the
+	// Viewer may have moved a slider and moved it back. And a Pattern has just
+	// switched the Explosion off, so that switch has to show it; without this the
+	// interface would claim a rule the Run is not using. Narrowing this to the
+	// Grid controls would break that silently.
 	panel.refresh();
 }
 
@@ -267,6 +271,33 @@ function frame(now: number): void {
 		// was chosen for and the next Random is genuinely random.
 		const pattern = restart.pattern;
 		restart.pattern = null;
+
+		/*
+		 * A Pattern switches the Explosion off; Random does not switch it on.
+		 *
+		 * Gosper's gun rests on four Cells that never change state, so with the
+		 * Explosion on they reach Maximum Age and detonate — the gun runs perfectly
+		 * for about two hundred Generations and then dismantles itself, which reads
+		 * as the product breaking rather than as a rule worth watching. A Pattern is
+		 * a description of one Run rather than a setting, and the rule that Run needs
+		 * is part of what was chosen.
+		 *
+		 * **The asymmetry is deliberate and this is the whole of it.** Random is not
+		 * mentioned below because it does not touch the control at all: a Viewer who
+		 * tries a Pattern and then presses Random inherits the Explosion off, and so
+		 * inherits plain Conway decaying into still lifes. That cost was accepted
+		 * rather than overlooked — switching it back on would reset the control every
+		 * time a Pattern was re-selected, which takes away watching the gun detonate
+		 * on schedule. The switch stays live either way.
+		 *
+		 * Set before `restartRun`, not after: the changed-dimensions path builds a new
+		 * Simulation from `settings`, and the reseed-in-place path is picked up by the
+		 * settings diff further down this same frame.
+		 */
+		if (pattern !== null) {
+			settings.explosion = false;
+		}
+
 		restartRun(pattern);
 	}
 
