@@ -3,7 +3,14 @@ import {
 	createGrid,
 	type Grid,
 	MAX_REPRESENTABLE_AGE,
+	setAgeAt,
 } from "@/sim/grid";
+import {
+	type Pattern,
+	patternHasCellAt,
+	patternHeight,
+	patternWidth,
+} from "@/sim/patterns";
 import { nextGeneration } from "@/sim/rules";
 import { LayerStack } from "@/sim/stack";
 
@@ -151,18 +158,26 @@ export class Simulation {
 	}
 
 	/**
-	 * Ends the current Run and begins a new one from a fresh random Seed.
+	 * Ends the current Run and begins a new one.
 	 *
-	 * The Seed is always random. Choosing *when* a new one is generated is the
-	 * only influence over what a Run contains — there is no pattern picker and no
-	 * placing of Cells.
+	 * Without a Pattern the Seed is random, which is what a fresh page load and
+	 * the Random control both do. With one, Generation 0 holds that Pattern and
+	 * nothing else — the Viewer chooses from a fixed list the product ships, never
+	 * composing or placing Cells themselves.
+	 *
+	 * Both are Restarts in every other sense: the Stack clears, the Generation
+	 * counter returns to 0, and the Run continues at the Grid it was built with.
 	 */
-	restart(): void {
+	restart(pattern?: Pattern): void {
 		clearGrid(this.currentGrid);
 
-		const ages = this.currentGrid.ages;
-		for (let index = 0; index < ages.length; index++) {
-			ages[index] = this.random() < this.seedDensity ? 1 : 0;
+		if (pattern === undefined) {
+			const ages = this.currentGrid.ages;
+			for (let index = 0; index < ages.length; index++) {
+				ages[index] = this.random() < this.seedDensity ? 1 : 0;
+			}
+		} else {
+			this.placePattern(pattern);
 		}
 
 		this.generationCount = 0;
@@ -173,7 +188,54 @@ export class Simulation {
 		this.layers.clear();
 		this.layers.push(this.currentGrid, 0);
 	}
+
+	/**
+	 * Writes a Pattern into the cleared Grid at Age 1.
+	 *
+	 * **Placed toward the top-left rather than centred**, and that is about where
+	 * the Pattern's output goes rather than about tidiness. Gosper's gun emits
+	 * gliders travelling south-east, so centring it would halve the distance they
+	 * cover before the Bounded Edge destroys them — and the streak those gliders
+	 * carve through time is the entire reason for offering the Pattern. A small
+	 * inset rather than hard against the corner, so the reflector blocks are not
+	 * touching the boundary.
+	 *
+	 * A Pattern too large for the Grid throws. It is unreachable from the
+	 * interface — the Grid floor is set from the largest Pattern shipped, so every
+	 * selectable Grid holds every Pattern — which makes it a programmer error, and
+	 * `.zalwa/stack.md` says those are loud rather than handled.
+	 */
+	private placePattern(pattern: Pattern): void {
+		const width = patternWidth(pattern);
+		const height = patternHeight(pattern);
+
+		if (width > this.width || height > this.height) {
+			throw new Error(
+				`Pattern "${pattern.name}" is ${width}x${height}, larger than the ${this.width}x${this.height} Grid`,
+			);
+		}
+
+		const columnOffset = Math.min(PATTERN_INSET, this.width - width);
+		const rowOffset = Math.min(PATTERN_INSET, this.height - height);
+
+		for (let row = 0; row < height; row++) {
+			for (let column = 0; column < width; column++) {
+				if (patternHasCellAt(pattern, column, row)) {
+					setAgeAt(this.currentGrid, columnOffset + column, rowOffset + row, 1);
+				}
+			}
+		}
+	}
 }
+
+/**
+ * Cells between a Pattern and the top-left boundary.
+ *
+ * Enough that a Pattern with live Cells on its own edge is not immediately
+ * interacting with the Bounded Edge, small enough that it does not eat into the
+ * room the Pattern's output needs on the other side.
+ */
+const PATTERN_INSET = 1;
 
 function validateMaximumAge(value: number): number {
 	if (!Number.isInteger(value) || value < 1) {
