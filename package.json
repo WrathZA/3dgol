@@ -15,6 +15,7 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"smoke": "node e2e/smoke.mjs",
+		"og-image": "node e2e/og-capture.mjs",
 		"format": "biome check --write",
 		"lint": "biome check",
 		"typecheck": "tsc --noEmit",
