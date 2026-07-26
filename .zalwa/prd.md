@@ -31,7 +31,7 @@ it builds.
 
 ### The rule
 
-- #26 feat: a cell dying of old age explodes into its neighbours
+- #30 feat: turn the explosion off
 
 Standard Conway (B3/S23) on a flat grid, plus two additions:
 
@@ -271,6 +271,8 @@ is already building when the page settles.
 
 ### B2 — Control speed
 
+- #29 feat: the run starts at 15 generations per second
+
 The Viewer raises the speed → generations visibly advance more frequently and the structure grows upward
 faster. Lowers it → generations advance less frequently and growth slows. The change takes effect on the
 current run without clearing the stack.
@@ -307,6 +309,8 @@ sheets. Decreases it → gaps open between cells, layers read as scattered point
 structure becomes visible through the gaps. The camera does not move.
 
 ### B7 — Set grid dimensions
+
+- #31 feat: the grid reaches 128 cells on each side
 
 The Viewer changes width or height → the change is accepted but does not alter the current run, and the
 interface indicates the new dimensions apply on restart. On restart (B8), the new run uses them.
