@@ -500,10 +500,21 @@ export function createControlPanel(
 		});
 
 		chooser.addEventListener("change", () => {
-			const chosen = patterns[Number(chooser.value)];
+			const selected = chooser.value;
 			// Back to the placeholder before anything else, so the control is ready to
 			// fire again even if the Restart below is somehow not taken.
 			chooser.value = "";
+
+			// The placeholder is a selection like any other, and reaching it fires a
+			// change: a keyboard Viewer arrowing down to a Pattern and back up lands
+			// here. Rejected explicitly rather than left to the lookup, because
+			// `Number("")` is 0 — so falling through would silently start a Run with
+			// the first Pattern in the list.
+			if (selected === "") {
+				return;
+			}
+
+			const chosen = patterns[Number(selected)];
 			if (chosen === undefined) {
 				return;
 			}
