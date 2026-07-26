@@ -12,17 +12,15 @@ history window, #6 drew it, #8 gave it colour, fade, and cubic edge-drawn cells,
 can walk around, #9 gave it a control panel for Speed, Depth Window, Maximum Age, and Cell Size, #10
 added staged Grid dimensions and Restart, #26 made reaching Maximum Age detonate, #32 signed the panel, #11
 laid the whole thing out for a phone, #37 made that layout survive a real one, #29 raised the starting
-Speed to 10 Generations per second, and #30 made the detonation a reset rather than a death and gave the
-Viewer a switch for it.
+Speed to 10 Generations per second, #30 made the detonation a reset rather than a death and gave the
+Viewer a switch for it, and #42 added a starting-Pattern picker with Gosper's glider gun.
 
 Not yet built: link previews (#13). The instance ceiling the panel permits has never been measured —
 deliberate, and owned by #12, which is now `priority:deferred` and reachable only via `/zalwa-ride 12`.
 
 Queued: the author's mark is under the contrast threshold at rest (#35), `pnpm smoke` writes a screenshot to
-the repo root that is not gitignored (#34), and the PRD's tuned-defaults list does not name the starting
-Speed (#41). #42 (a starting-pattern picker) was blocked by #30 and is now unblocked — a Gosper's gun needs
-the permanence the Explosion switch provides, since its reflector blocks would otherwise detonate and
-dismantle the gun after about two hundred Generations.
+the repo root that is not gitignored (#34) — hit twice more during #42 — and the PRD's tuned-defaults list
+does not name the starting Speed (#41).
 
 Deferred by decision rather than by ordering: the drawing budget (#12) and the near-monochrome Colour
 Gradient at the A=200 default (#28) both carry `priority:deferred`, so neither surfaces in auto-pick. #31
@@ -77,14 +75,15 @@ src/
     grid.ts           Grid storage, index arithmetic, Bounded Edge, neighbour counting
     rules.ts          B3/S23 + saturating age + the Explosion at Maximum Age
     stack.ts          LayerStack — ring buffer, Depth Window, retirement
-    simulation.ts     Run state — generation counter, Maximum Age, Stack, advance(), restart()
+    simulation.ts     Run state — counter, Maximum Age, Explosion, Stack, advance(), restart(pattern?)
+    patterns.ts       Named starting arrangements as data — Gosper's glider gun
     clock.ts          Elapsed time to Generations — pause, resume, backgrounded-tab cap
   render/             Drawing — may read the simulation, never the reverse
     scene.ts          Renderer, camera, OrbitControls, resize, reframe on extent change
     instances.ts      Instanced geometry, GLSL shaders, ring slot arithmetic, uniforms
     structure.ts      Binds a Run's Stack to the instance buffer; re-lays the ring
   ui/                 Control surface — mutates settings, knows nothing else
-    panel.ts          Seven controls plus Restart, the sheet toggle, the 100dvh layer holding both
+    panel.ts          Seven settings, the Pattern chooser and Random, the toggle, the 100dvh layer
     panel.css         Both arrangements — desktop column, small-viewport sheet, coarse-pointer targets
     signature.ts      The author's mark — original SVG, links out to GitHub
 e2e/
@@ -99,6 +98,7 @@ tests/
     clock.test.ts     Pause banks nothing, resume has no burst, long gaps are capped
   render/
     instances.test.ts Ring slot arithmetic and Stack placement height
+    patterns.test.ts  Pattern measurement, ragged rows, the Grid floor holding every Pattern
   settings.test.ts    Setting bounds, step snapping, clamping
 biome.json            Scoped to src/, tests/, and config files only
 vite.config.ts        @/ alias + Vitest config (tests live in tests/**/*.test.ts)
@@ -174,6 +174,10 @@ settings are bounded in the same table; being bounded and being applied immediat
 The Explosion has no entry there, because a boolean has no range — which is why `SETTING_BOUNDS` and
 `clampSettings` stay numeric and `panel.ts` derives its switch-able settings from the `Settings` type
 instead.
+
+The starting **Pattern** is a third kind: not live, not staged, and not a setting at all. It never sits in
+the settings object — it travels on the Restart request and is consumed by the Run it starts, because it
+describes one Run's Generation 0 rather than a value the product holds.
 
 The consequence is an interface obligation, not just a code one: a staged change that silently waits is
 indistinguishable from one that failed, so `panel.ts` marks a staged value whose Run has not caught up yet
@@ -291,6 +295,29 @@ than `===` because Maximum Age is Viewer-adjustable and lowering it leaves Cells
 The Bounded Edge holds inside the Explosion: every write is gated by `contains()`, so a detonation at the
 boundary scatters only inward.
 
+### `src/sim/patterns.ts`
+
+Named starting arrangements as data (#42). No placement policy, no rendering, no knowledge of the control
+that offers them — a Pattern is a picture of live Cells and nothing else.
+
+Rows are strings of `#` and `.` rather than coordinate pairs, because the point of a curated Pattern is that
+a human recognises it in the source. Ragged rows are allowed: `patternHasCellAt` reads past the end of a
+short row as dead, so trailing dots are optional. Adding a Pattern is one entry in `PATTERNS` — the control
+reads that array and the Simulation takes whatever it is handed.
+
+**`largestPatternExtent()` is what the Grid floor is set from**, and `patterns.test.ts` asserts
+`largest ≤ SETTING_BOUNDS.gridWidth.min`. That is the safeguard: adding a Pattern bigger than the floor
+fails the suite rather than reaching a Viewer as a clipped shape.
+
+**A reflector block is a catalyst, not a still life** — worth knowing before editing the gun. The queen-bee
+shuttle disturbs each block's inner face every cycle and the block reforms, so only the *outer* column of
+each is continuously alive. Four Cells age without interruption, not eight, and those four are what reaches
+Maximum Age and detonates. The natural description ("stationary blocks whose cells never change state") is
+wrong, and #42 shipped with that belief until a test contradicted it.
+
+Exposes: `Pattern`, `GOSPER_GLIDER_GUN`, `PATTERNS`, `patternWidth`, `patternHeight`, `patternHasCellAt`,
+`largestPatternExtent`.
+
 ### `src/sim/stack.ts`
 
 Owns the bounded window of history — which Layers are retained and which are gone.
@@ -335,6 +362,13 @@ Setting `explosion` follows the same discipline (#30) and is tested for it: the 
 already computed — the Generation counter, every held Layer, and the Grid are untouched — and takes effect
 from the next `advance()`. Switching it on does not retroactively detonate the Cells already sitting at the
 cap; they detonate at the next Generation.
+
+`restart(pattern?)` takes an optional Pattern (#42). Absent means a random Seed, which is what a fresh page
+load and the Random control both do; present means Generation 0 holds that Pattern and nothing else.
+`placePattern()` writes it inset one Cell from the **top-left rather than centred** — Gosper's gun emits
+south-east, so centring would halve the distance its gliders cover before the Bounded Edge, and that travel
+is the reason the Pattern is offered. A Pattern too large for the Grid throws; it is unreachable from the
+interface because the Grid floor is set from the largest Pattern shipped, which makes it a programmer error.
 
 `advance()` pushes the new Generation onto the Stack. `restart()` clears it and pushes the Seed — **a
 fresh Stack holds one Layer, not zero.** Generation 0 is a Generation like any other, and skipping it
@@ -462,8 +496,24 @@ should not throw away where they were standing.
 
 ### `src/ui/panel.ts`
 
-Seven controls — six sliders and a switch — plus the Restart button. Mutates plain objects; imports nothing
-from `sim/` or `render/`.
+Seven settings — six sliders and a switch — plus the two ways to start a fresh Run: a Pattern chooser and
+the Random button, sharing one row. Mutates plain objects; imports nothing from `sim/` or `render/` **at
+runtime**.
+
+That last qualifier is load-bearing since #42. The panel needs to know what a `Pattern` *is* to hand one
+back on the Restart request, so it takes a **type-only** import from `sim/patterns` — erased at build — and
+receives the actual list through `ControlPanelOptions.patterns` from the composition root. A value import
+was written first and would have quietly falsified this module's own docblock; if one appears again, that is
+the regression.
+
+**`RestartRequest` carries the Pattern, not the panel.** A Pattern is chosen *for one Restart*: holding it
+as panel state would mean pressing Random after picking the gun silently re-seeds the gun. `main.ts` takes
+and clears both fields together in the same frame.
+
+**The chooser needs a placeholder it returns to after every choice.** A `<select>` fires no `change` event
+when the already-selected option is chosen again, so without one, picking the same Pattern twice would
+silently do nothing. The handler also rejects the empty value *explicitly* before the lookup — `Number("")`
+is `0`, so falling through would start a Run with the first Pattern, which arrow-key navigation reaches.
 
 Native `<input type="range">` and `<input type="checkbox">` restyled rather than hand-drawn controls:
 pointer capture, touch, keyboard, and screen-reader semantics come free, and #11's touch requirement depends
@@ -610,11 +660,12 @@ Exposes: `createSignatureMark`.
 ## Known risks
 
 - **The instance cap has no number, and the panel now permits four times what has ever shipped.** Defaults
-  are 48 × 48 × 60 — about 138,000 instances — chosen to look right, not measured. Since #9 the Depth Window
+  are 50 × 50 × 60 — 150,000 instances — chosen to look right, not measured. Since #9 the Depth Window
   slider reaches 120; since #10 both Grid dimensions reach 96. A Viewer can therefore ask for
   96 × 96 × 120 = 1,105,920 instances, roughly thirteen million triangles a frame, and the ring is
   *allocated* at the Depth Window ceiling regardless of the current setting. The cost is area, not length:
-  96 is four times 48, not twice. Every instance is transformed each frame whether its Cell is alive or dead,
+  96 is nearly four times 50, not twice. #42 raised the floor to 50, so the smallest Run a Viewer can ask
+  for is now the default rather than 16 × 16 — the bottom of the range went up, not just the middle. Every instance is transformed each frame whether its Cell is alive or dead,
   and in a typical Run most are dead. There is no server to absorb any of it. `SETTING_BOUNDS` is
   deliberately the single place #12 writes the measured limit for both halves of the product.
 - **The Colour Gradient is tuned for a short lifespan and the default lifespan is now 200.** Colour maps
@@ -632,7 +683,7 @@ Exposes: `createSignatureMark`.
 - **`@types/three` versions independently of `three`.** Currently aligned at 0.185.1. Upgrade the two
   together and deliberately.
 - **The dissolve depends on a flat background.** Fading toward `BACKGROUND_COLOR` keeps Cells opaque and
-  correctly depth-sorted, which real transparency across 138,000 unsorted instances would not. A gradient
+  correctly depth-sorted, which real transparency across 150,000 unsorted instances would not. A gradient
   or image behind the structure would force that decision to be revisited.
 - **Darkening terms compound.** Face shading, the edge rim, and the depth fade all reduce the same pixel.
   Each is defensible alone; together they once turned the middle of the structure to mud. Check the render

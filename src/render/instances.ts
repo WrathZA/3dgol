@@ -546,7 +546,7 @@ void main() {
 
 	// Mixing toward the background rather than using alpha keeps every Cell
 	// opaque, so depth sorting stays correct. Against a flat background the two
-	// are indistinguishable — and 138,000 unsorted transparent instances would
+	// are indistinguishable — and 150,000 unsorted transparent instances would
 	// punch holes through each other.
 	float fade = smoothstep(FADE_START, 1.0, vSunk);
 	vec3 lit = mix(base * shade, uBackground, fade);
