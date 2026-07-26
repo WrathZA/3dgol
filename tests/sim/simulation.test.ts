@@ -301,6 +301,22 @@ describe("Simulation", () => {
 	});
 
 	describe("Pattern", () => {
+		/**
+		 * The gun's four continuously-alive Cells, in Grid coordinates.
+		 *
+		 * The *outer* column of each reflector block. The inner column is disturbed
+		 * and reformed every cycle — a reflector is a catalyst, not a still life — so
+		 * only these four age without interruption, and only these four reach Maximum
+		 * Age. They are what the Explosion destroys, and therefore what #46 exists to
+		 * protect.
+		 */
+		const PERMANENT_BLOCK_CELLS = [
+			[1, 5],
+			[1, 6],
+			[36, 3],
+			[36, 4],
+		] as const;
+
 		/** A Run seeded with the gun, on a Grid the interface would permit. */
 		function gunRun(explosion = false, maximumAge = 200) {
 			const simulation = new Simulation({
@@ -408,12 +424,7 @@ describe("Simulation", () => {
 			//
 			// These four are what reaches Maximum Age, which is why the Explosion
 			// dismantles the gun and why #30 blocked this issue.
-			for (const [column, row] of [
-				[1, 5],
-				[1, 6],
-				[36, 3],
-				[36, 4],
-			] as const) {
+			for (const [column, row] of PERMANENT_BLOCK_CELLS) {
 				expect(ageAt(simulation.grid, column, row)).toBe(200);
 			}
 
@@ -423,10 +434,12 @@ describe("Simulation", () => {
 		});
 
 		it("is dismantled by the Explosion, which is why #30 blocked this", () => {
-			// The gun's reflector blocks never change state, so they age continuously
-			// and reach Maximum Age. With the Explosion on they detonate and the gun
-			// destroys itself — the dependency that made #30 a blocker rather than a
-			// tidiness concern. A low cap brings it forward from ~200 Generations.
+			// Each reflector block's outer column never changes state, so those four
+			// Cells age continuously and reach Maximum Age. With the Explosion on they
+			// detonate and the gun destroys itself — the dependency that made #30 a
+			// blocker rather than a tidiness concern, and the reason #46 switches the
+			// Explosion off when a Pattern is chosen. A low cap brings the detonation
+			// forward from the ~200 Generations it takes at the default.
 			const simulation = gunRun(true, 20);
 
 			for (let generation = 0; generation < 30; generation++) {
@@ -438,6 +451,39 @@ describe("Simulation", () => {
 			const settled =
 				ageAt(simulation.grid, 1, 5) > 20 && ageAt(simulation.grid, 2, 5) > 20;
 			expect(settled).toBe(false);
+		});
+
+		it("detonates on the next Generation when the Viewer switches the Explosion back on", () => {
+			// #46 switches the Explosion off for a Pattern, and the switch stays live —
+			// so a Viewer who wants to watch the gun blow itself up can still ask for
+			// it. This is the opt-back-in path: the gun runs untouched, then the very
+			// next Generation after the switch flips, the Cells sitting at the cap go.
+			const simulation = gunRun();
+
+			for (let generation = 0; generation < 300; generation++) {
+				simulation.advance();
+			}
+
+			const generation = simulation.generation;
+			const depth = simulation.stack.depth;
+
+			// The four permanently-alive reflector Cells have saturated at the cap.
+			for (const [column, row] of PERMANENT_BLOCK_CELLS) {
+				expect(ageAt(simulation.grid, column, row)).toBe(200);
+			}
+
+			simulation.explosion = true;
+			simulation.advance();
+
+			// Every one of them detonated and was thrown back to the start of its life
+			// by its own burst, so the gun's machinery is broken.
+			for (const [column, row] of PERMANENT_BLOCK_CELLS) {
+				expect(ageAt(simulation.grid, column, row)).toBe(1);
+			}
+
+			// And the Run continued rather than restarting — no reseed, no Stack clear.
+			expect(simulation.generation).toBe(generation + 1);
+			expect(simulation.stack.depth).toBe(depth);
 		});
 
 		it("still seeds randomly when no Pattern is given", () => {

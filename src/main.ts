@@ -1,6 +1,11 @@
 import { createScene } from "@/render/scene";
 import { createStructureView, type StructureView } from "@/render/structure";
-import { clampSettings, DEFAULT_SETTINGS, SETTING_BOUNDS } from "@/settings";
+import {
+	applyStartRule,
+	clampSettings,
+	DEFAULT_SETTINGS,
+	SETTING_BOUNDS,
+} from "@/settings";
 import { advanceClock, retimeAccumulator } from "@/sim/clock";
 import { PATTERNS, type Pattern } from "@/sim/patterns";
 import { Simulation } from "@/sim/simulation";
@@ -208,9 +213,13 @@ function restartRun(pattern: Pattern | null): void {
 		run.accumulated = 0;
 	}
 
-	// The staged dimensions are the running ones now, so the panel's pending marks
-	// have to clear — including on the path where nothing about them changed, since
-	// the Viewer may have moved a slider and moved it back.
+	// Re-reads every control, and two things depend on it rather than one. The
+	// staged dimensions are the running ones now, so the pending marks have to
+	// clear — including on the path where nothing about them changed, since the
+	// Viewer may have moved a slider and moved it back. And a Pattern has just
+	// switched the Explosion off, so that switch has to show it; without this the
+	// interface would claim a rule the Run is not using. Narrowing this to the
+	// Grid controls would break that silently.
 	panel.refresh();
 }
 
@@ -267,6 +276,17 @@ function frame(now: number): void {
 		// was chosen for and the next Random is genuinely random.
 		const pattern = restart.pattern;
 		restart.pattern = null;
+
+		// A Pattern switches the Explosion off; Random changes nothing. The rule and
+		// the reasoning live in `settings.ts` so they can be tested — this module is
+		// unreachable by any unit test.
+		//
+		// Called before `restartRun`, not after: the changed-dimensions path builds a
+		// new Simulation from `settings`, and the reseed-in-place path is picked up by
+		// the settings diff further down this same frame. Either way no Generation is
+		// computed under the rule the Viewer just left behind.
+		applyStartRule(settings, pattern);
+
 		restartRun(pattern);
 	}
 

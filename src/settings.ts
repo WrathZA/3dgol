@@ -1,3 +1,7 @@
+// Type-only: `applyStartRule` needs to know what a Pattern is, and nothing more.
+// Erased at build, so this module still pulls in nothing at runtime.
+import type { Pattern } from "@/sim/patterns";
+
 /**
  * The values a Run starts with, and the range each one may be moved through.
  *
@@ -200,6 +204,43 @@ export function clampSettings(settings: Settings): Settings {
 		clamped[key] = clampSetting(settings[key], SETTING_BOUNDS[key]);
 	}
 	return clamped;
+}
+
+/**
+ * Applies the rule a Run's Seed requires, before that Run starts.
+ *
+ * **A Pattern switches the Explosion off. Random changes nothing.**
+ *
+ * Most Patterns worth shipping rest on Cells that never change state, and those
+ * Cells reach Maximum Age. Gosper's gun rests on four: with the Explosion on it
+ * runs perfectly for about two hundred Generations and then blows itself apart,
+ * which reads as the product breaking rather than as a rule worth watching. A
+ * Pattern is a description of one Run rather than a value the product holds, so
+ * the rule that Run needs is part of what the Viewer chose.
+ *
+ * The asymmetry is the whole of it, and it is deliberate: `null` falls through
+ * untouched, so pressing Random after a Pattern inherits the Explosion off and
+ * with it a Run that decays into still lifes. That cost was accepted rather than
+ * overlooked — restoring the Explosion on Random would reset the control every
+ * time a Pattern was re-selected, taking away the reading where the gun detonates
+ * on schedule. The switch stays live, and the Viewer can see it is off.
+ *
+ * Lives here rather than in the composition root so it can be tested at all: the
+ * root imports three.js and is reachable by no unit test. This is the only rule
+ * in the product where one control moves another, which is exactly the kind of
+ * thing that should not sit in an untestable module.
+ *
+ * Mutates rather than returning a copy, because the panel holds a reference to
+ * this object and reads it back to redraw — a copy would update the Run and leave
+ * the interface asserting a rule that is not running.
+ */
+export function applyStartRule(
+	settings: Settings,
+	pattern: Pattern | null,
+): void {
+	if (pattern !== null) {
+		settings.explosion = false;
+	}
 }
 
 /** Digits after the decimal point in a step, so rounding matches it exactly. */
