@@ -12,10 +12,18 @@ import {
 // passed in by the composition root, so this module still imports nothing from
 // the Simulation at runtime.
 import type { Pattern } from "@/sim/patterns";
-import { createSignatureMark } from "@/ui/signature";
+import { createSignatureMark, createSourceMark } from "@/ui/signature";
 
-/** Where the mark points. The product's only outbound link. */
-const AUTHOR_PROFILE = "https://github.com/WrathZA";
+/**
+ * Where the two marks point — the product's only outbound links.
+ *
+ * Two rather than one, and they are deliberately different kinds of destination.
+ * The figure is a signature and goes to the author; the octocat is a signpost and
+ * goes to this project's source. Sending both to the same place would make one of
+ * them redundant, which is the argument for having exactly these two and no more.
+ */
+const AUTHOR_SITE = "https://orca.rodeo/";
+const PROJECT_SOURCE = "https://github.com/WrathZA/3dgol";
 
 /**
  * Panels built so far, so each one's id is its own.
@@ -571,25 +579,35 @@ export function createControlPanel(
 	note.append(pointerHint, touchHint);
 	element.append(note);
 
-	// The author's mark, and the only way out of the product.
+	// The credits row: the author's mark, and the two ways out of the product.
 	//
-	// A new tab rather than the current one: History is a window, not an archive
-	// — the Stack holds at most N Layers and everything past that is gone. A
-	// Viewer who navigates away and comes back does not resume, they restart from
-	// a fresh Seed, and the Run they were watching is unrecoverable. `noopener`
-	// also denies the opened page a handle on this one, which `noreferrer` alone
-	// would not.
-	const signature = document.createElement("a");
-	signature.className = "panel__signature";
-	signature.href = AUTHOR_PROFILE;
-	signature.target = "_blank";
-	signature.rel = "noopener noreferrer";
-	// The drawing is `aria-hidden`, so this is the link's entire accessible name.
-	// It says whose profile and where, because "GitHub" alone tells a screen
-	// reader user nothing about where the one outbound link goes.
-	signature.setAttribute("aria-label", "Built by WrathZA — profile on GitHub");
-	signature.append(createSignatureMark());
-	element.append(signature);
+	// A new tab in both cases rather than the current one: History is a window,
+	// not an archive — the Stack holds at most N Layers and everything past that
+	// is gone. A Viewer who navigates away and comes back does not resume, they
+	// restart from a fresh Seed, and the Run they were watching is unrecoverable.
+	// `noopener` also denies the opened page a handle on this one, which
+	// `noreferrer` alone would not. This applies to *every* link added here, and
+	// is the reason there is a helper rather than two hand-built anchors that
+	// could drift apart.
+	const credits = document.createElement("div");
+	credits.className = "panel__credits";
+	credits.append(
+		// The drawing is `aria-hidden` in both cases, so these labels are each
+		// link's entire accessible name. They say where the link goes rather than
+		// what it looks like, because "GitHub" alone tells a screen reader user
+		// nothing about which of the two outbound links they have landed on.
+		createOutboundLink(
+			AUTHOR_SITE,
+			"Built by WrathZA — orca.rodeo",
+			createSignatureMark(),
+		),
+		createOutboundLink(
+			PROJECT_SOURCE,
+			"Source code for this project on GitHub",
+			createSourceMark(),
+		),
+	);
+	element.append(credits);
 
 	/*
 	 * The layer both controls live in, and the reason it exists.
@@ -635,6 +653,30 @@ export function createControlPanel(
 			layer.remove();
 		},
 	};
+}
+
+/**
+ * One link out of the product, wrapped around a mark.
+ *
+ * A helper rather than two hand-built anchors because `target` and `rel` are the
+ * part that must not drift: a second link added later without `noopener` hands
+ * the opened page a handle on this one, and that is exactly the kind of omission
+ * that is invisible in review. Routing every outbound link through here makes the
+ * safe form the only form available.
+ */
+function createOutboundLink(
+	href: string,
+	label: string,
+	mark: SVGSVGElement,
+): HTMLAnchorElement {
+	const link = document.createElement("a");
+	link.className = "panel__signature";
+	link.href = href;
+	link.target = "_blank";
+	link.rel = "noopener noreferrer";
+	link.setAttribute("aria-label", label);
+	link.append(mark);
+	return link;
 }
 
 /**

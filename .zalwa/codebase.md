@@ -89,7 +89,7 @@ src/
   ui/                 Control surface — mutates settings, knows nothing else
     panel.ts          Six settings, the Pattern chooser and Random, the toggle, the 100dvh layer
     panel.css         Both arrangements — desktop column, small-viewport sheet, coarse-pointer targets
-    signature.ts      The author's mark — original SVG, links out to GitHub
+    signature.ts      The author's mark (original SVG) and GitHub's octocat — the two links out
 e2e/
   smoke.mjs           Headless render + screenshot; `--phone` checks the sheet in both orientations
 tests/
@@ -675,8 +675,11 @@ answers: a tablet is wide enough for the desktop column and is still operated by
 desktop window is small and still has a mouse. Only the *hit* area grows — the visible track stays 2px and
 the signature mark stays small, because the problem is where a tap lands, not what the panel looks like.
 
-**There are two floors, not one, and #37 is why.** Restart, the toggle, and the signature get 44px: they
-are tapped once. Sliders get 32px. The first version gave everything 44px and the sheet needed 852px of
+**There are two floors, not one, and #37 is why.** Restart, the toggle, and each credits link get 44px:
+they are tapped once. Sliders get 32px. The 44px floor sits on the links rather than on the credits row,
+so both are targets — a row tall enough would say nothing about the octocat, which is the smaller of the
+two and the easier to miss, and `pnpm smoke --phone` measures each separately because `.panel__signature`
+now matches both. The first version gave everything 44px and the sheet needed 852px of
 content in a 664px viewport — six controls plus their separation accounted for 508px of it — so most of
 them ended up below the fold and *every* control got harder to reach. A slider is dragged rather than
 tapped and spans the panel's full width, so its height is the least of what makes it hittable. The
@@ -730,8 +733,14 @@ exactly what a DOM test harness does.
 
 ### `src/ui/signature.ts`
 
-The author's mark — a bowler-hatted figure with an apple where the face is — and the product's only
-outbound link (#32, PRD B13).
+Both marks in the credits row: the author's mark — a bowler-hatted figure with an apple where the face is
+— and GitHub's octocat beside it. Together they are the product's only two outbound links (#32, PRD B13).
+
+**The two marks are held to opposite rules, on purpose.** The figure is drawn from scratch because it is a
+*signature* and an original drawing is the point. The octocat is GitHub's own file, taken from Octicons
+under its MIT licence, because it is a *signpost* — it has to be recognised instantly by someone who has
+never seen this product, and an invented GitHub logo would fail at the only thing it is for. Anyone
+tempted to "fix" the inconsistency should read both reasons before touching either.
 
 **Original geometry, and it has to stay that way.** Magritte's *The Son of Man* is under copyright until
 2038 and licensed through SABAM/ADAGP. The composition and the joke are not protected; his rendering of

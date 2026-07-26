@@ -152,8 +152,15 @@ silhouette and individual cells.
 
 ### Author credit
 
-The product is signed. A small mark sits at the bottom of the controls and links to the author's GitHub
-profile — **the only outbound link in the product**, and the only place its author is present.
+The product is signed. A small mark sits at the bottom of the controls and links to the author's site, and
+a GitHub mark beside it links to this project's source. **These are the only two outbound links in the
+product**, and the mark is the only place its author is present.
+
+**Two links, and the pair is the limit rather than the start of a list.** They are different kinds of
+destination and that is what earns the second one: the figure is a *signature* and goes to the person, the
+GitHub mark is a *signpost* and goes to the code. Pointing both at the same place would make one redundant,
+and any third link would have to answer a question these two do not leave open. The count is stated here so
+that adding one is a change to this document rather than a detail nobody notices.
 
 The mark is a bowler-hatted figure with an apple where the face is: an original drawing of the idea behind
 Magritte's *The Son of Man*, not a reproduction of the painting. The painting is under copyright until 2038.
@@ -545,15 +552,24 @@ is currently true.
 
 ### B13 — Find who made it
 
-At the bottom of the controls the Viewer sees a small bowler-hatted figure with an apple for a face.
-Activating it — by pointer or by touch — opens the author's GitHub profile in a new tab, and the run
-carries on undisturbed in the tab behind it.
+At the bottom of the controls the Viewer sees a small bowler-hatted figure with an apple for a face, and a
+GitHub mark beside it. Activating the figure — by pointer or by touch — opens the author's site in a new
+tab; activating the GitHub mark opens this project's source. Either way the run carries on undisturbed in
+the tab behind it.
 
-The mark is dim at rest and brightens on hover and on keyboard focus, so it is findable without competing
-with the structure. It is reachable by keyboard, and a screen reader announces where it goes rather than
-merely that there is a link.
+Both marks are dim at rest and brighten on hover and on keyboard focus, so they are findable without
+competing with the structure. Each brightens on its own rather than as a pair, because a Viewer needs to
+know which of the two they are about to follow. Both are reachable by keyboard, and a screen reader
+announces where each goes rather than merely that there is a link — "GitHub" alone would not distinguish
+them, since the author is on GitHub too.
 
-This is the only way out of the product. Everything else the Viewer can do keeps them inside it.
+The GitHub mark is GitHub's own, taken from a set they publish under a licence permitting it. That is the
+opposite of the rule the figure is held to, and deliberately so: the figure is a signature, where an
+original drawing is the entire point, while the GitHub mark is a signpost that has to be recognised
+instantly by someone who has never seen this product. An invented one would fail at the only thing it is
+for.
+
+These two are the only ways out of the product. Everything else the Viewer can do keeps them inside it.
 
 ## Out of Scope (v1)
 

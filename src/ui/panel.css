@@ -508,24 +508,49 @@
 }
 
 /*
- * The author's mark.
+ * The credits row — the author's mark, and the source link beside it.
  *
- * A block rather than an inline link so the hit area is the full width of the
- * panel: the drawing is 3rem tall and only about 2.4rem wide, which is under the
- * 44px minimum on its short side, and a thumb aiming at a small drawing in the
- * corner of a phone should not have to be accurate. The rule above it separates
- * the signature from the controls without adding another visible element —
- * it is the same hairline the controls use between themselves.
+ * The row owns the separating rule and the spacing; the links inside own their
+ * own hit areas. That split is what lets a second link be added without the two
+ * of them drawing two hairlines or fighting over the margin. The rule is the
+ * same one the controls use between themselves, so the row is parted from them
+ * without adding another visible element.
+ *
+ * A row rather than a stack, and that is a height decision rather than a
+ * compositional one: the sheet fits its smallest supported viewport with no
+ * headroom at all, so a second line here would push it straight back into
+ * overflow. Side by side, the row costs exactly what one mark cost.
  */
-.panel__signature {
+.panel__credits {
 	display: flex;
+	align-items: center;
 	justify-content: center;
+	gap: 1.4rem;
 	margin-top: 0.9rem;
 	padding-top: 0.85rem;
 	border-top: 1px solid rgb(205 214 228 / 8%);
+}
 
-	/* Dim at rest. The mark is a signature, not a control — it should be findable
-	 * without competing with the thing the Viewer came to look at. */
+/*
+ * One outbound link.
+ *
+ * Centred flex with a minimum height rather than a bare inline anchor: the
+ * figure is only about 2.05rem wide and the octocat narrower still, both under
+ * the 44px minimum on their short side, and a thumb aiming at a small drawing in
+ * the corner of a phone should not have to be accurate. The padding is what
+ * turns each drawing into a target.
+ */
+.panel__signature {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 3rem;
+	padding-inline: 0.7rem;
+
+	/* Dim at rest. These are a signature and a signpost, not controls — they
+	 * should be findable without competing with the thing the Viewer came to look
+	 * at. Each link carries its own colour so only the one under the pointer
+	 * brightens. */
 	color: rgb(205 214 228 / 34%);
 	transition: color 160ms ease-out;
 }
@@ -550,6 +575,23 @@
 
 	/* Filled, not stroked. Hairlines matched the panel's rules but dissolved into
 	 * an unreadable glyph at 3rem; a silhouette is what survives being small. */
+	fill: currentColor;
+	stroke: none;
+}
+
+/*
+ * The source mark, deliberately smaller than the figure.
+ *
+ * Matched heights were tried first and the row read as two logos of equal
+ * standing. The octocat is a solid disc and the figure is mostly negative space,
+ * so equal *height* is not equal weight — half the height is roughly where the
+ * two stop competing and the row reads as a signature with a source link beside
+ * it, which is the relationship that is actually true.
+ */
+.panel__source-mark {
+	display: block;
+	height: 1.5rem;
+	width: auto;
 	fill: currentColor;
 	stroke: none;
 }
@@ -774,17 +816,26 @@
 	}
 
 	/*
-	 * The mark shrinks with everything else. It is a signature rather than a
-	 * control, so it is the one element here that can afford to be small — and at
-	 * 3rem it was the third-largest thing in the sheet.
+	 * The marks shrink with everything else. They are a signature and a signpost
+	 * rather than controls, so they are the elements here that can afford to be
+	 * small — and at 3rem the figure was the third-largest thing in the sheet.
 	 */
-	.panel__signature {
+	.panel__credits {
 		margin-top: 0.6rem;
 		padding-top: 0.6rem;
+		gap: 1.1rem;
+	}
+
+	.panel__signature {
+		min-height: 0;
 	}
 
 	.panel__signature-mark {
 		height: 1.6rem;
+	}
+
+	.panel__source-mark {
+		height: 1.1rem;
 	}
 }
 
@@ -871,9 +922,12 @@
 	}
 
 	/*
-	 * The mark is drawn small and hit large — the same split as the sliders.
-	 * Shrinking the drawing to buy vertical space took the link's hit area down
-	 * with it, and this is a link a thumb has to land on, not a decoration.
+	 * The marks are drawn small and hit large — the same split as the sliders.
+	 * Shrinking the drawings to buy vertical space took the links' hit areas down
+	 * with them, and these are links a thumb has to land on, not decorations.
+	 * Applied to each link rather than to the row, so both are targets: the row
+	 * being tall enough would say nothing about the octocat, which is the smaller
+	 * of the two and the easier one to miss.
 	 */
 	.panel__signature {
 		align-items: center;
