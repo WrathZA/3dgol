@@ -13,8 +13,8 @@ can walk around, #9 gave it a control panel for Speed, Depth Window, Maximum Age
 added staged Grid dimensions and Restart, #26 made reaching Maximum Age detonate, #32 signed the panel, #11
 laid the whole thing out for a phone, #37 made that layout survive a real one, #29 raised the starting
 Speed to 10 Generations per second, #30 made the detonation a reset rather than a death and gave the
-Viewer a switch for it, #42 added a starting-Pattern picker with Gosper's glider gun, and #46 made
-choosing a Pattern switch the Explosion off so the gun is not destroyed by it.
+Viewer a switch for it, #42 added a starting-Pattern picker with Gosper's glider gun, #46 made choosing a
+Pattern switch the Explosion off so the gun is not destroyed by it, and #49 grew that list to seven.
 
 Not yet built: link previews (#13). The instance ceiling the panel permits has never been measured —
 deliberate, and owned by #12, which is now `priority:deferred` and reachable only via `/zalwa-ride 12`.
@@ -77,7 +77,7 @@ src/
     rules.ts          B3/S23 + saturating age + the Explosion at Maximum Age
     stack.ts          LayerStack — ring buffer, Depth Window, retirement
     simulation.ts     Run state — counter, Maximum Age, Explosion, Stack, advance(), restart(pattern?)
-    patterns.ts       Named starting arrangements as data — Gosper's glider gun
+    patterns.ts       Named starting arrangements as data — seven Patterns, each with a stable id
     clock.ts          Elapsed time to Generations — pause, resume, backgrounded-tab cap
   render/             Drawing — may read the simulation, never the reverse
     scene.ts          Renderer, camera, OrbitControls, resize, reframe on extent change
@@ -96,7 +96,8 @@ tests/
     rules.test.ts     Golden Life patterns, Age semantics, saturation, the Explosion
     stack.test.ts     Retirement, Depth Window resize, constant memory, copy-not-reference
     simulation.test.ts Run lifecycle, Seed density, determinism, Explosion, Pattern seeding, Stack
-    patterns.test.ts  Pattern measurement, ragged rows, the Grid floor holding every Pattern
+    patterns.test.ts  Pattern measurement, ragged rows, id uniqueness, the Grid floor
+    pattern-fidelity.test.ts  Is each Pattern actually that Pattern — period round-trips
     clock.test.ts     Pause banks nothing, resume has no burst, long gaps are capped
   render/
     instances.test.ts Ring slot arithmetic and Stack placement height
@@ -319,7 +320,32 @@ reads that array and the Simulation takes whatever it is handed.
 
 **`largestPatternExtent()` is what the Grid floor is set from**, and `patterns.test.ts` asserts
 `largest ≤ SETTING_BOUNDS.gridWidth.min`. That is the safeguard: adding a Pattern bigger than the floor
-fails the suite rather than reaching a Viewer as a clipped shape.
+fails the suite rather than reaching a Viewer as a clipped shape. Currently 36 wide (the gun) by 13 tall
+(the pulsar) against a floor of 50.
+
+**Each Pattern carries a stable `id`, and it is what the chooser keys on (#49).** Not the array index — an
+index resolves to a different Pattern the moment the list is reordered, and does so silently. #50 reads the
+same id out of the URL, which is why there must be exactly one naming scheme. `patterns.test.ts` asserts the
+ids are unique and match `/^[a-z0-9-]+$/`, since an id becomes a query parameter verbatim.
+
+**A Pattern is verified by its period, not by looking at it (#49).** `pattern-fidelity.test.ts` advances
+each oscillator exactly one period and compares against Generation 0, **and separately asserts it does not
+return early** — the second half is what stops a still life passing trivially or a shorter-period impostor
+passing by coincidence. This is not ceremony: it caught the queen bee shuttle shipping with 23 Cells and no
+period at all. A mistranscribed Pattern still renders and still looks like something, so nothing else finds
+it. Methuselahs have no period and are pinned instead by exact starting Cell count, by outliving 300
+Generations, and by settling — compared two Generations apart, because what they settle into includes
+blinkers.
+
+**Published Pattern figures are for an unbounded Grid.** Population counts and lifetimes quoted in the
+literature do not transfer: the Bounded Edge trims the sprawl, so an acorn here settles smaller and sooner
+than the usual figures suggest. A test asserting a published number will fail for the right reason and look
+like the wrong one.
+
+**Two Patterns were considered and deliberately excluded (#49)**, recorded beside `PATTERNS` because that is
+where the next person asking "why isn't there a spaceship" will be reading. A lone spaceship leaves the Grid
+permanently empty once the Bounded Edge destroys it; Simkin's glider gun is period 120 against a default
+Depth Window of 60.
 
 **A reflector block is a catalyst, not a still life** — worth knowing before editing the gun. The queen-bee
 shuttle disturbs each block's inner face every cycle and the block reforms, so only the *outer* column of
@@ -327,8 +353,9 @@ each is continuously alive. Four Cells age without interruption, not eight, and 
 Maximum Age and detonates. The natural description ("stationary blocks whose cells never change state") is
 wrong, and #42 shipped with that belief until a test contradicted it.
 
-Exposes: `Pattern`, `GOSPER_GLIDER_GUN`, `PATTERNS`, `patternWidth`, `patternHeight`, `patternHasCellAt`,
-`largestPatternExtent`.
+Exposes: `Pattern`, `PATTERNS`, the seven Pattern constants (`GOSPER_GLIDER_GUN`, `PULSAR`,
+`PENTADECATHLON`, `KOKS_GALAXY`, `QUEEN_BEE_SHUTTLE`, `R_PENTOMINO`, `ACORN`), `patternWidth`,
+`patternHeight`, `patternHasCellAt`, `largestPatternExtent`.
 
 ### `src/sim/stack.ts`
 
@@ -533,10 +560,17 @@ the regression.
 as panel state would mean pressing Random after picking the gun silently re-seeds the gun. `main.ts` takes
 and clears both fields together in the same frame.
 
+**The chooser keys its options by Pattern `id`, not by array index (#49).** An index resolves to a
+different Pattern the moment the list is reordered, and does so silently — and it would leave the product
+with two ways to name a Pattern, which is what the id exists to prevent. #50 reads the same id from the URL.
+
 **The chooser needs a placeholder it returns to after every choice.** A `<select>` fires no `change` event
 when the already-selected option is chosen again, so without one, picking the same Pattern twice would
-silently do nothing. The handler also rejects the empty value *explicitly* before the lookup — `Number("")`
-is `0`, so falling through would start a Run with the first Pattern, which arrow-key navigation reaches.
+silently do nothing. The handler also rejects the empty value explicitly, though since #49 that is
+belt-and-braces rather than the only defence: matching on id means an empty value matches nothing. Under the
+old index lookup it was load-bearing, because `Number("")` is `0` and falling through started a Run with the
+first Pattern — reachable by arrow key, and patched in #46. Keying on id removed the hazard by construction
+rather than guarding it, which is the better shape of fix when it is available.
 
 Native `<input type="range">` and `<input type="checkbox">` restyled rather than hand-drawn controls:
 pointer capture, touch, keyboard, and screen-reader semantics come free, and #11's touch requirement depends
