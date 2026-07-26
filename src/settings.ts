@@ -65,9 +65,11 @@ export const SETTING_BOUNDS = {
 	 */
 	depthWindow: { min: 10, max: 120, step: 1 },
 	/**
-	 * The floor is 2 rather than 1: at 1 every Cell dies the Generation after
-	 * it is born, so nothing ever survives to traverse the Colour Gradient and
-	 * the structure degenerates into unconnected sparks.
+	 * The floor is 2 rather than 1: at 1 every Cell is at the cap the moment it
+	 * is born, so with the Explosion on every live Cell detonates every
+	 * Generation and the Grid saturates, and with it off nothing ever traverses
+	 * the Colour Gradient because every Cell is already at its end. Neither is a
+	 * setting, they are both the control ceasing to mean anything.
 	 *
 	 * The ceiling is 200, and the default sits on it. That is a deliberate
 	 * choice with a real cost: nothing reaches the cap before Generation 200,

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { ageAt, createGrid, type Grid, setAgeAt } from "@/sim/grid";
-import { diesOfOldAge, nextAge, nextGeneration } from "@/sim/rules";
+import { nextAge, nextGeneration, reachedMaximumAge } from "@/sim/rules";
 
 import {
 	aliveCells,
@@ -330,18 +330,18 @@ describe("Explosion on Death by Old Age", () => {
 	});
 });
 
-describe("diesOfOldAge", () => {
-	it("is true at the cap and beyond, so a lowered Maximum Age still kills", () => {
-		expect(diesOfOldAge(24, 24)).toBe(true);
+describe("reachedMaximumAge", () => {
+	it("is true at the cap and beyond, so a lowered Maximum Age still detonates", () => {
+		expect(reachedMaximumAge(24, 24)).toBe(true);
 		// A Viewer lowering the slider leaves Cells already past the new value.
-		expect(diesOfOldAge(200, 24)).toBe(true);
+		expect(reachedMaximumAge(200, 24)).toBe(true);
 	});
 
 	it("is false below the cap", () => {
-		expect(diesOfOldAge(23, 24)).toBe(false);
+		expect(reachedMaximumAge(23, 24)).toBe(false);
 	});
 
 	it("is false for a dead position, which has no Age to have reached", () => {
-		expect(diesOfOldAge(0, 24)).toBe(false);
+		expect(reachedMaximumAge(0, 24)).toBe(false);
 	});
 });
