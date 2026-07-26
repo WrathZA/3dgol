@@ -557,7 +557,81 @@
 	.panel__toggle {
 		display: inline-flex;
 	}
+
+	/*
+	 * Tightening, and the budget it comes from.
+	 *
+	 * The sheet has to hold six sliders, Restart, the hint, and the signature in
+	 * roughly 580px. The first version needed 852px and scrolled — measured at
+	 * 390 × 664 with the sheet open — with the six controls alone accounting for
+	 * 508px of it. So the cuts have to come from the controls, and everything
+	 * around them gives up what it can.
+	 *
+	 * The panel's own padding shrinks too, because it is paid twice: once at the
+	 * top and once at the bottom of a box that is already the tightest thing on
+	 * the screen.
+	 */
+	.panel {
+		padding: 0.75rem 0.9rem 0.85rem;
+	}
+
+	/*
+	 * The heading goes. The toggle that opened the sheet says "Controls" and is
+	 * still on screen beneath it, so the sheet repeating the word costs 28px to
+	 * tell the Viewer something they just read. `display: none` rather than a
+	 * visual hide would take it from the accessibility tree, so it is positioned
+	 * out of view instead and still names the region for a screen reader.
+	 */
+	.panel__title {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: 0;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	.panel__label {
+		margin-bottom: 0.2rem;
+	}
+
+	.panel__restart {
+		margin-top: 0.6rem;
+	}
+
+	.panel__note {
+		margin-top: 0.6rem;
+	}
+
+	/*
+	 * The mark shrinks with everything else. It is a signature rather than a
+	 * control, so it is the one element here that can afford to be small — and at
+	 * 3rem it was the third-largest thing in the sheet.
+	 */
+	.panel__signature {
+		margin-top: 0.6rem;
+		padding-top: 0.6rem;
+	}
+
+	.panel__signature-mark {
+		height: 1.6rem;
+	}
 }
+
+/*
+ * Headroom, and why there has to be some.
+ *
+ * Everything above was tuned against a measurement taken in headless Chromium on
+ * Linux, where the panel's font stack falls through to whatever that machine has.
+ * An iPhone resolves the same stack to `-apple-system`, whose metrics are not the
+ * same — so a layout measured to fit with two pixels to spare is a layout that
+ * fits on the machine it was measured on. The trims above leave the sheet roughly
+ * 60px under its own cap so the difference has somewhere to go.
+ *
+ * If a control is ever added, re-measure rather than assuming the slack absorbs
+ * it: `pnpm smoke --phone` fails when the content stops fitting.
+ */
 
 /*
  * Fingers.
@@ -568,28 +642,36 @@
  * window is small and still has a mouse. Sizing targets by width would leave the
  * first of those with 20px sliders.
  *
- * The numbers are all 2.75rem — 44px, the smallest target a finger hits reliably
- * — and they are applied to the *hit* area only. The slider's visible track stays
- * 2px and the thumb stays where it is: growing what is drawn would coarsen the
- * panel on every touch device to solve a problem that is about where a tap lands,
- * not about what it looks like.
+ * They apply to the *hit* area only. The slider's visible track stays 2px and the
+ * thumb stays where it is: growing what is drawn would coarsen the panel on every
+ * touch device to solve a problem that is about where a tap lands, not about what
+ * it looks like.
+ *
+ * **Two numbers, not one, and the difference is the lesson from #37.** Restart and
+ * the toggle get 44px — the usual minimum for a target a finger has to land on
+ * once. The sliders get 32px, because six of them stacked on a phone are not six
+ * independent targets: at 44px apiece plus the separation they needed, the sheet
+ * ran 270px past the screen and every control was harder to reach for it. A
+ * slider is also dragged rather than tapped, and it spans the full width of the
+ * panel, so the height is the least of what makes it hittable. Sizing each
+ * control correctly in isolation produced an interface that failed as a whole.
  */
 @media (pointer: coarse) {
 	.panel__slider {
-		height: 2.75rem;
+		height: 2rem;
 	}
 
 	/* The thumb is centred on the track by a negative margin, so its offset has to
 	 * follow the taller input or the thumb floats away from the line it rides. */
 	.panel__slider::-webkit-slider-thumb {
-		width: 1.1rem;
-		height: 1.1rem;
-		margin-top: -0.5rem;
+		width: 1.05rem;
+		height: 1.05rem;
+		margin-top: -0.47rem;
 	}
 
 	.panel__slider::-moz-range-thumb {
-		width: 1.1rem;
-		height: 1.1rem;
+		width: 1.05rem;
+		height: 1.05rem;
 	}
 
 	.panel__restart {
@@ -601,12 +683,13 @@
 	}
 
 	/*
-	 * Separation, not just size. Two 44px targets touching are one 88px target
-	 * that does the wrong thing half the time, and the sliders here sit in a
-	 * single column with nothing but a hairline between them.
+	 * Separation, not just size — but less of it than the first attempt used.
+	 * Adjacent sliders are already parted by a label row carrying the setting's
+	 * name and value, so the gap here is what keeps two *hit* areas from touching,
+	 * not what makes the two controls distinguishable.
 	 */
 	.panel__control + .panel__control {
-		margin-top: 1.15rem;
-		padding-top: 1.15rem;
+		margin-top: 0.35rem;
+		padding-top: 0.35rem;
 	}
 }
