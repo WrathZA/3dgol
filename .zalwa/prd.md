@@ -31,53 +31,68 @@ it builds.
 
 ### The rule
 
-- #30 feat: turn the explosion off
-
-Standard Conway (B3/S23) on a flat grid, plus two additions:
+Standard Conway (B3/S23) on a flat grid, plus one addition:
 
 - **Birth** — a dead cell with exactly 3 live neighbours becomes alive, at age 1.
-- **Survival** — a live cell with 2 or 3 live neighbours stays alive, and its age increments.
+- **Survival** — a live cell with 2 or 3 live neighbours stays alive, and its age increments, stopping at
+  the maximum age **A** rather than counting past it.
 - **Death by over/underpopulation** — any other live cell dies.
-- **Death by old age** — a live cell that reaches the maximum age **A** dies at the next generation,
-  regardless of its neighbour count.
-- **Explosion** — a cell dying of old age scatters life into its neighbourhood: every one of its eight
-  neighbours inside the grid becomes alive at age 1, whatever the rule above would otherwise have made of
-  them. A dead neighbour is born, a settled neighbour of any age is thrown back to the start of its life.
+- **Explosion** — a live cell that reaches **A** detonates at the next generation, scattering life across
+  its own position and every one of its eight neighbours inside the grid. All of them become alive at age
+  1, whatever the rule above would otherwise have made of them: a dead position is born, a settled cell of
+  any age is thrown back to the start of its life, and the detonating cell itself is thrown back with them.
 
-Death by old age is a deliberate departure from classic Conway, and it exists to keep the structure
-moving. On a bounded grid, classic Conway reliably decays into still lifes and blinkers within a few
-hundred generations; from that point the structure is unchanging vertical stripes extruding upward
-forever, which is visually dead. Capping cell age means no configuration is permanently stable — a still
-life that survives A generations dies, disturbing its neighbourhood and re-seeding movement into a region
-that had stopped.
+**Age alone never kills.** A is a trigger and the top of the colour gradient, not a lifespan — the only way
+a cell is removed is ordinary Conway death by over- or underpopulation. A cell reaching A does not vacate
+its position; it starts again, and has to age all the way to A once more before it can detonate again.
 
-The explosion makes that disturbance the visible event rather than an incidental side effect. A long-lived
-pillar does not quietly stop; it detonates, and the region around it starts again from age 1. This is also
+The explosion is a deliberate departure from classic Conway, and it exists to keep the structure moving. On
+a bounded grid, classic Conway reliably decays into still lifes and blinkers within a few hundred
+generations; from that point the structure is unchanging vertical stripes extruding upward forever, which
+is visually dead. Making A detonate means no configuration is permanently stable — a still life that
+survives A generations blows itself and its neighbourhood back to age 1, re-seeding movement into a region
+that had stopped, and the disturbance is the visible event rather than an incidental side effect. A
+long-lived pillar does not quietly stop; it detonates, and the region around it starts again. This is also
 the mechanism that stops a bounded run from thinning away to nothing over thousands of generations.
 
-Three constraints on the explosion, each of which matters:
+Two constraints on the explosion, each of which matters:
 
-- **Only death by old age explodes.** Ordinary over- and underpopulation deaths are silent, as in classic
-  Conway. This is not an aesthetic preference but a necessity: exploding on *every* death fills a bounded
-  grid to roughly three-quarters within three generations and holds it there permanently, which collapses
-  the colour gradient to a single colour, makes A meaningless, and turns the structure into an opaque brick.
-- **A cell that also reached A is not revived by its neighbour's explosion.** Two adjacent cells at the cap
-  are each other's neighbour, so reviving them would let a cluster reset itself wholesale and the age cap
-  would stop breaking up the very configurations it exists to disturb. A cluster reaching A together
-  therefore leaves a hole with a young shell around it.
+- **Only reaching A explodes.** Ordinary over- and underpopulation deaths are silent, as in classic Conway.
+  This is not an aesthetic preference but a necessity: exploding on *every* death fills a bounded grid to
+  roughly three-quarters within three generations and holds it there permanently, which collapses the
+  colour gradient to a single colour, makes A meaningless, and turns the structure into an opaque brick.
+  Detonating only at A settles instead at a few per cent live at the default, and around a fifth even when
+  A is low enough that nearly everything is detonating at once.
 - **The explosion reads only the previous generation**, so nothing chains within a single step. A position
   lit by one explosion cannot itself explode until it has aged all the way to A again.
+
+There is deliberately no exception for a neighbour that has also reached A. One would be unobservable:
+since a cell at A revives its own position, such a neighbour lands at age 1 through its own detonation
+regardless. A cluster reaching A together therefore resets whole, leaving a solid patch of new colour
+rather than a hole.
 
 The bounded edge holds here too: an explosion at the boundary scatters only inward, and no position outside
 the grid becomes alive.
 
-A is the same number as the top of the colour gradient (see Cell), so a cell's colour is a countdown to
-its own death: it passes through the full palette as it ages, and dies as it reaches the end. The gradient
-is therefore always fully used, and the Viewer can read a region's remaining lifespan at a glance.
+**The explosion can be switched off, and doing so removes the mechanism rather than muting it.** With it
+off nothing whatsoever happens at A: a cell there simply carries on, and its age saturates so the colour
+gradient still has a defined top end. The rule is then plain Conway on a bounded grid. There is
+deliberately no third state in which a cell dies quietly of age — that configuration was measured at
+0.9–1.4% live by generation 250 against 4–6% with the explosion, which is a slow bleed rather than a rule,
+so the cap and the burst are one control rather than two.
+
+The default is on, because off is the state the explosion exists to prevent: within a few hundred
+generations the structure stops changing, and a first-time viewer must not land there without having asked
+for it.
+
+A is the same number as the top of the colour gradient (see Cell), so a cell's colour is a countdown to its
+own detonation: it passes through the full palette as it ages, and blows up as it reaches the end. The
+gradient is therefore always fully used, and the Viewer can read at a glance how long a region has left
+before it goes.
 
 **A defaults to its own maximum, and that is a deliberate choice against the reasoning above.** A high A
-behaves closer to classic Conway, which is the behaviour the age cap was introduced to prevent — so for the
-first A generations of a run, nothing explodes and the population decays. At the default, the first
+behaves closer to classic Conway, which is the behaviour the explosion was introduced to prevent — so for
+the first A generations of a run, nothing explodes and the population decays. At the default, the first
 explosion arrives around generation 214, roughly twenty seconds in at the default speed. What that buys is
 the sparse and dramatic reading: ages spread right across the palette instead of bunching young, pillars
 grow tall enough to be worth losing, and their explosions are events rather than weather. A viewer who
@@ -108,8 +123,10 @@ Applied immediately, without disturbing the run in progress:
 
 - **Speed** — how fast generations advance, including pausing entirely.
 - **Depth (N)** — how many generations of history are visible at once.
-- **Maximum age (A)** — how long a cell can live before dying of old age, which is also the span of the
-  colour gradient.
+- **Maximum age (A)** — how long a cell lives before it detonates, which is also the span of the colour
+  gradient.
+- **Explosion** — whether reaching A detonates at all. Off, nothing happens at A and the rule is plain
+  Conway; the age still governs colour. Defaults on.
 - **Cell size** — how large each cell is drawn, and therefore whether layers read as porous scatters or
   solid sheets.
 
@@ -152,6 +169,7 @@ Responsibilities:
 - Watches the structure build.
 - Controls simulation speed, including pausing and resuming.
 - Sets the depth window (N layers) and the maximum cell age (A).
+- Switches the explosion on and off, which is also what decides whether anything happens at A at all.
 - Sets how large cells are drawn.
 - Sets the grid dimensions, which apply on the next restart.
 - Moves the camera — orbits, pans, and zooms around the structure while it builds, by pointer or by touch.
@@ -174,15 +192,22 @@ One position within a single generation of the grid.
 |-------|---------|
 | `column`, `row` | Position within the grid |
 | `alive` | Whether the cell is alive in this generation |
-| `age` | Number of consecutive generations this cell has been alive. Set to 1 on birth, incremented each generation it survives, discarded on death. A cell that dies and is later reborn starts again at 1. |
+| `age` | Number of consecutive generations this cell has been alive, stopping at the maximum age A rather than counting past it. Set to 1 on birth, incremented each generation it survives, discarded on death. A cell that dies and is later reborn starts again at 1, and so does one that detonates. |
 
 `age` drives colour: cells are rendered along a colour gradient keyed to age, so a freshly born cell reads
 differently from a long-stable one.
 
-Age is bounded by the **maximum age A** — the death-by-old-age threshold from the rule above. A cell
-reaching A dies, so age never exceeds it. A is also the top of the colour gradient: a cell traverses the
-full palette exactly once over its lifetime and dies as it arrives at the final colour. Colour and
-lifespan are the same quantity expressed two ways, which is why they are deliberately not independent
+Age is bounded by the **maximum age A** — the explosion threshold from the rule above. With the explosion
+on, a cell reaching A is thrown back to 1 by its own detonation, so age never exceeds A. With it off
+nothing happens at A and the cell carries on, so age **saturates** there instead: it stops climbing and the
+cell holds at the end of the palette. Either way A is the top of the colour gradient and age never runs
+past it, which is what keeps the gradient's far end meaningful rather than shared by every long-lived cell.
+
+Saturation is why `age` is not strictly "consecutive generations alive" — a cell held at A has survived
+longer than its age says. That is deliberate: the alternative leaves the gradient's top end undefined.
+
+A cell traverses the full palette exactly once and detonates as it arrives at the final colour, so colour
+and lifespan are the same quantity expressed two ways, which is why they are deliberately not independent
 settings. A is Viewer-adjustable — a low A produces constant churn punctuated by frequent explosions, a
 high A behaves closer to classic Conway for long stretches and then detonates rarely and conspicuously.
 
@@ -222,9 +247,10 @@ The bounded edge is a deliberate choice over a wrapping torus. Patterns reaching
 destroyed rather than re-entering the opposite side, so the structure has a defined silhouette and a
 finite footprint the Viewer can orbit, rather than motion sliding endlessly around a seam.
 
-Bounded edges alone would let a run decay into permanent still lifes; death by old age (see The rule) is
-what prevents that, so the two choices work together — the boundary contains the structure, the age cap
-keeps it alive inside that boundary.
+Bounded edges alone would let a run decay into permanent still lifes; the explosion (see The rule) is what
+prevents that, so the two choices work together — the boundary contains the structure, the explosion keeps
+it alive inside that boundary. Switching the explosion off is precisely what surrenders that, which is why
+it is not the default.
 
 **Dimension changes take effect only on restart.** A new width or height is accepted and held, but the run
 in progress continues at its existing size until the Viewer restarts. A layer computed at one grid size
@@ -240,7 +266,8 @@ The live running state, distinct from the frozen history in the stack.
 | `currentGeneration` | Generation counter for the run |
 | `cells` | The current live grid, with each live cell's age |
 | `speed` | Generations advanced per unit of time. Viewer-adjustable. |
-| `maxAge` | A — the age at which a live cell dies of old age, and the top of the colour gradient. Viewer-adjustable. |
+| `maxAge` | A — the age at which a live cell detonates, and the top of the colour gradient. Viewer-adjustable. |
+| `explosion` | Whether reaching A detonates at all. Off, the rule is plain Conway and A governs colour alone. Viewer-adjustable, and applied to the run in progress. |
 | `running` | Whether generations are currently advancing |
 
 ### Seed
@@ -310,15 +337,18 @@ does not reseed.
 
 ### B5 — Set the maximum age (A)
 
-The Viewer lowers A → live cells die sooner, visibly increasing churn, and the colour gradient compresses
-so cells traverse the full palette in fewer generations. The Viewer raises A → cells persist longer,
-regions stay stable for longer stretches, and the palette is traversed more slowly. Cells already older
-than a newly lowered A die at the next generation.
+The Viewer lowers A → live cells detonate sooner, visibly increasing churn, and the colour gradient
+compresses so cells traverse the full palette in fewer generations. The Viewer raises A → cells persist
+longer, regions stay stable for longer stretches, and the palette is traversed more slowly. Cells already
+older than a newly lowered A detonate at the next generation.
 
-Because death by old age explodes, lowering A far enough to catch a lot of established cells produces a wave
-of explosions rather than a quiet mass death — the structure flares as everything past the new threshold
-detonates at once. That is a consequence of the two behaviours meeting, and it is left in rather than
+Lowering A far enough to catch a lot of established cells therefore produces a wave of explosions — the
+structure flares as everything past the new threshold detonates at once. That is left in rather than
 suppressed: it is the most direct way a Viewer can make something happen on demand.
+
+With the explosion switched off, A moves the palette and nothing else: cells neither detonate nor die at
+it, so lowering A recolours the structure without disturbing it, and cells already past the new value are
+pulled back to its final colour rather than flaring.
 
 ### B6 — Set cell size
 
@@ -360,23 +390,39 @@ At any moment, cells of different ages are visibly different colours along the g
 colour advances through the palette as it survives successive generations. A newly born cell in a
 long-stable region is immediately distinguishable from its neighbours.
 
-### B12 — Cells die of old age, and explode
+### B12 — Cells detonate at maximum age
 
-A live cell that reaches age A dies at the next generation regardless of its neighbour count. The Viewer
-observes that no region of the structure remains unchanged indefinitely: a column of stable cells
-terminates once its cells reach A, and the disturbance re-seeds movement into that region.
+A live cell that reaches age A detonates at the next generation. The Viewer observes that no region of the
+structure remains unchanged indefinitely: a column of stable cells is interrupted once its cells reach A,
+and the disturbance re-seeds movement into that region.
 
-The disturbance is visible rather than inferred. When the column ends, the cells around it light up at the
-start of the gradient — the Viewer sees a burst of newborn colour spreading outward from where the old cells
-were, and can watch movement resume in a region that had been still. A cluster reaching A together leaves a
-hole ringed by that new colour, because cells at the cap do not revive each other.
+The disturbance is visible rather than inferred. Where the column was, the whole neighbourhood lights up at
+the start of the gradient — the Viewer sees a burst of newborn colour, and can watch movement resume in a
+region that had been still. A cluster reaching A together resets whole, leaving a solid patch of new colour
+rather than a hole, because a detonating cell throws its own position back to the start of its life along
+with its neighbours'.
 
 An ordinary death looks nothing like this. Cells dying of over- or underpopulation simply stop, so the
-Viewer can tell the two kinds of death apart by watching: one is a disappearance, the other is a burst.
+Viewer can tell a death from a detonation by watching: one is a disappearance, the other is a burst.
 
 At the default A the first burst is some way into a run — the Viewer watching from the start sees the
 structure build and thin for a while before anything detonates. Lowering A brings the bursts forward and
 makes them frequent.
+
+### B12a — Switch the explosion off
+
+The Viewer switches the explosion off → nothing happens at A any more. Cells that reach it carry on rather
+than detonating, and the run becomes plain Conway on a bounded grid: within a few hundred generations it
+settles into still lifes and blinkers, and the structure above them is unchanging vertical stripes. Long-
+lived cells hold at the final colour of the gradient rather than passing beyond it.
+
+The Viewer switches it back on → the cells sitting at A detonate at the next generation, so a structure
+that had stopped bursts back into movement. Neither switch clears the stack, reseeds, or disturbs the
+history already built; the change lands on the next generation and the structure carries on from where it
+was.
+
+This is the one control that changes which rule is running rather than a quantity within it, which is why
+it is a switch rather than a slider, and why it defaults on.
 
 ### B13 — Find who made it
 
@@ -394,9 +440,10 @@ This is the only way out of the product. Everything else the Viewer can do keeps
 
 The following are deliberately not built in v1.
 
-1. **Editable rule sets.** The birth/survival rule is fixed at B3/S23, and death by old age always explodes.
-   The Viewer adjusts the maximum age A, but cannot enter arbitrary rules (B/S notation, Generations-family
-   rules, or custom neighbourhoods), and cannot turn the explosion off or change what it reaches.
+1. **Editable rule sets.** The birth/survival rule is fixed at B3/S23. The Viewer adjusts the maximum age A
+   and switches the explosion on or off, but cannot enter arbitrary rules (B/S notation,
+   Generations-family rules, or custom neighbourhoods), and cannot change what the explosion reaches or
+   what it leaves behind.
 
 2. **A true 3-dimensional cellular automaton.** No 26-neighbour lattice, no 3D rules such as 5766. This is
    a permanent non-goal, not a deferral — the third axis is time, and making it space would delete the

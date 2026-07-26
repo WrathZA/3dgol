@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { population } from "@/sim/grid";
+import { ageAt, population, setAgeAt } from "@/sim/grid";
 import {
 	DEFAULT_SEED_DENSITY,
 	type RandomSource,
@@ -212,9 +212,89 @@ describe("Simulation", () => {
 			simulation.maximumAge = 3;
 			simulation.advance();
 
-			// Every Cell that had reached the new cap is gone.
+			// Every Cell that had reached the new cap is back at the start of the
+			// Gradient or below it — none runs past.
 			for (const age of simulation.grid.ages) {
 				expect(age).toBeLessThanOrEqual(3);
+			}
+		});
+	});
+
+	describe("Explosion", () => {
+		it("is on unless asked otherwise", () => {
+			const simulation = new Simulation({
+				width: 8,
+				height: 8,
+				maximumAge: 4,
+			});
+
+			expect(simulation.explosion).toBe(true);
+		});
+
+		it("switches mid-Run without clearing the Stack or reseeding", () => {
+			const simulation = new Simulation({
+				width: 16,
+				height: 16,
+				maximumAge: 4,
+				random: seededRandom(11),
+			});
+
+			for (let generation = 0; generation < 6; generation++) {
+				simulation.advance();
+			}
+
+			const generation = simulation.generation;
+			const layers = simulation.stack.depth;
+			const before = Array.from(simulation.grid.ages);
+
+			simulation.explosion = false;
+
+			// The switch alone changes nothing already computed — the Run keeps its
+			// Generation counter, every Layer it holds, and the Grid it is on.
+			expect(simulation.explosion).toBe(false);
+			expect(simulation.generation).toBe(generation);
+			expect(simulation.stack.depth).toBe(layers);
+			expect(Array.from(simulation.grid.ages)).toEqual(before);
+
+			// And it takes effect from the next Generation, which continues the Run
+			// rather than starting one.
+			simulation.advance();
+			expect(simulation.generation).toBe(generation + 1);
+			expect(simulation.stack.depth).toBe(layers + 1);
+		});
+
+		it("leaves a still life standing at the cap while it is off", () => {
+			// A block on an otherwise empty Grid survives forever under plain Conway,
+			// and its Age stops at the cap rather than running past it.
+			const simulation = new Simulation({
+				width: 8,
+				height: 8,
+				maximumAge: 3,
+				explosion: false,
+				seedDensity: 0,
+			});
+
+			const block = simulation.grid;
+			for (const [column, row] of [
+				[3, 3],
+				[4, 3],
+				[3, 4],
+				[4, 4],
+			] as const) {
+				setAgeAt(block, column, row, 1);
+			}
+
+			for (let generation = 0; generation < 12; generation++) {
+				simulation.advance();
+			}
+
+			for (const [column, row] of [
+				[3, 3],
+				[4, 3],
+				[3, 4],
+				[4, 4],
+			] as const) {
+				expect(ageAt(simulation.grid, column, row)).toBe(3);
 			}
 		});
 	});

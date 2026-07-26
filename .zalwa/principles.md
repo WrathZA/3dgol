@@ -46,16 +46,17 @@ exporting past states — contradicts it. Such a request is a PRD conversation, 
 This principle is recorded explicitly because scrubbing is the most tempting item on the out-of-scope
 list, and the natural instinct is to add it as a helpful extra.
 
-## 6. The age cap and the explosion are one mechanism
+## 6. Maximum Age is a trigger and a gradient, not a lifespan
 
-Death by Old Age exists to produce the Explosion. The PRD is explicit that the cap is there to keep the
-structure moving, and that the Explosion "makes that disturbance the visible event rather than an
-incidental side effect" — the cap's justification is the burst it causes.
+A cell reaching Maximum Age is never removed by the rule. With the Explosion on it detonates, resetting
+itself and every in-grid neighbour to age 1; with the Explosion off it simply carries on, and its age
+saturates at A so the Colour Gradient still has a top end. A is therefore two things and neither is a death
+sentence — the trigger for the burst, and the far end of the palette. Ordinary Conway death by over- and
+underpopulation is untouched in both branches.
 
-Stripped of the Explosion, the cap still perturbs a stable region: a still life dying does change its
-neighbours' counts. It simply does not sustain anything. #30's own measurements put the population at
-0.9–1.4% live by generation 250 with Explosions off, against 4–6% with them on — a slow bleed rather than
-a re-seeding. So any control that reaches one must reach both, and it should be named after the mechanism
-rather than after the Explosion. The Explosion is the half you can see; the cap is the half that decides
-whether anything is alive to see. This is recorded because the natural way to write that control is as a
-boolean named after the visible half, which ships the useless configuration by default.
+This is recorded because "maximum age" reads as a lifespan, and code written from that reading introduces a
+third state the product does not have: a quiet death at the cap. That state was measured when it existed —
+0.9–1.4% live by generation 250 against 4–6% with the burst — and it is a slow bleed rather than a rule.
+One control governs the burst because there is no separable half left to govern: strip the Explosion and the
+cap has no remaining behaviour to switch off. The control is named after the Explosion for the same reason,
+which is the opposite of what this principle said before the rule changed.

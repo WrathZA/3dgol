@@ -48,5 +48,5 @@ export function aliveCells(grid: Grid): string[] {
 	return cells.sort();
 }
 
-/** An Age high enough that Death by Old Age never fires during a test. */
+/** An Age high enough that the Explosion never fires during a test. */
 export const NO_AGE_LIMIT = 10_000;

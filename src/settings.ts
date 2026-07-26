@@ -11,8 +11,10 @@ export interface Settings {
 	gridHeight: number;
 	/** N — Layers of history retained. */
 	depthWindow: number;
-	/** Age at which a Cell dies regardless of its neighbours. */
+	/** Age at which a Cell detonates, and the far end of the Colour Gradient. */
 	maximumAge: number;
+	/** Whether a Cell reaching Maximum Age scatters life into its neighbourhood. */
+	explosion: boolean;
 	/** Generations advanced per second. Zero is a pause. */
 	generationsPerSecond: number;
 	/** Edge length of a drawn Cell, as a fraction of the lattice spacing. */
@@ -63,9 +65,11 @@ export const SETTING_BOUNDS = {
 	 */
 	depthWindow: { min: 10, max: 120, step: 1 },
 	/**
-	 * The floor is 2 rather than 1: at 1 every Cell dies the Generation after
-	 * it is born, so nothing ever survives to traverse the Colour Gradient and
-	 * the structure degenerates into unconnected sparks.
+	 * The floor is 2 rather than 1: at 1 every Cell is at the cap the moment it
+	 * is born, so with the Explosion on every live Cell detonates every
+	 * Generation and the Grid saturates, and with it off nothing ever traverses
+	 * the Colour Gradient because every Cell is already at its end. Neither is a
+	 * setting, they are both the control ceasing to mean anything.
 	 *
 	 * The ceiling is 200, and the default sits on it. That is a deliberate
 	 * choice with a real cost: nothing reaches the cap before Generation 200,
@@ -112,6 +116,14 @@ export type BoundedSetting = keyof typeof SETTING_BOUNDS;
  * Maximum Age starts at its own ceiling, which is the one default here chosen
  * for character rather than for comfort — see `SETTING_BOUNDS.maximumAge`.
  *
+ * The Explosion starts on, and the alternative is worse than it sounds. With it
+ * off the rule is plain Conway on a Bounded Edge Grid — nothing at all happens
+ * at Maximum Age — and the PRD is explicit about where that ends up: still lifes
+ * and blinkers within a few hundred Generations, after which the structure is
+ * unchanging vertical stripes extruding upward forever. That is the state the
+ * cap exists to prevent, so it is not somewhere a first-time Viewer should land
+ * without having asked for it.
+ *
  * Speed is 10 rather than something nearer the top of its range because the
  * structure has to stay legible while it builds. Past a certain rate a Layer is
  * on screen too briefly to be read as a shape, and the eye takes the whole thing
@@ -125,6 +137,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	gridHeight: 48,
 	depthWindow: 60,
 	maximumAge: 200,
+	explosion: true,
 	generationsPerSecond: 10,
 	cellSize: 0.55,
 };

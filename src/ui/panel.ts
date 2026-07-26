@@ -82,8 +82,20 @@ export interface ControlPanelOptions {
 	parent?: HTMLElement;
 }
 
-/** One control: which setting it moves, and how it is described. */
-interface ControlSpec {
+/**
+ * Settings that are a switch rather than a range.
+ *
+ * Derived from `Settings` rather than listed, so a boolean added there is
+ * offered here and a boolean removed there stops compiling — the panel cannot
+ * drift out of step with what a setting actually is.
+ */
+type BooleanSetting = {
+	[K in keyof Settings]: Settings[K] extends boolean ? K : never;
+}[keyof Settings];
+
+/** One slider: which setting it moves, and how it is described. */
+interface SliderSpec {
+	kind: "slider";
 	setting: BoundedSetting;
 	label: string;
 	/** Renders the current value for the readout beside the label. */
@@ -100,8 +112,20 @@ interface ControlSpec {
 	staged?: boolean;
 }
 
+/** One switch: a setting that is on or off rather than somewhere in a range. */
+interface SwitchSpec {
+	kind: "switch";
+	setting: BooleanSetting;
+	label: string;
+	format(value: boolean): string;
+	emphasis?(value: boolean): boolean;
+}
+
+type ControlSpec = SliderSpec | SwitchSpec;
+
 const CONTROLS: readonly ControlSpec[] = [
 	{
+		kind: "slider",
 		setting: "generationsPerSecond",
 		label: "Speed",
 		// Zero is not shown as "0/s" — it is a different state, not a slower one,
@@ -111,16 +135,33 @@ const CONTROLS: readonly ControlSpec[] = [
 		emphasis: (value) => value === 0,
 	},
 	{
+		kind: "slider",
 		setting: "depthWindow",
 		label: "Depth",
 		format: (value) => `${value} layers`,
 	},
 	{
+		kind: "slider",
 		setting: "maximumAge",
 		label: "Maximum age",
 		format: (value) => `${value} gens`,
 	},
+	// Directly beneath Maximum age, because the two are one mechanism: the age is
+	// what the Explosion triggers on, and switched off the age governs colour and
+	// nothing else. Separated in the panel, the pair reads as two unrelated
+	// settings that happen to share a word.
 	{
+		kind: "switch",
+		setting: "explosion",
+		label: "Explosion",
+		format: (value) => (value ? "On" : "Off"),
+		// Off is a different rule rather than a smaller number — plain Conway, with
+		// nothing at all happening at the cap — so it is worth spotting without
+		// reading, the same way Paused is.
+		emphasis: (value) => !value,
+	},
+	{
+		kind: "slider",
 		setting: "cellSize",
 		label: "Cell size",
 		// A proportion of the lattice spacing, which is what the number means:
@@ -128,12 +169,14 @@ const CONTROLS: readonly ControlSpec[] = [
 		format: (value) => `${Math.round(value * 100)}%`,
 	},
 	{
+		kind: "slider",
 		setting: "gridWidth",
 		label: "Grid width",
 		format: (value) => `${value} cells`,
 		staged: true,
 	},
 	{
+		kind: "slider",
 		setting: "gridHeight",
 		label: "Grid height",
 		format: (value) => `${value} cells`,
@@ -258,6 +301,62 @@ export function createControlPanel(
 	};
 
 	for (const control of CONTROLS) {
+		if (control.kind === "switch") {
+			// A native checkbox, restyled — the same reasoning as the sliders. It
+			// already answers to Space, to a tap, and to a screen reader as a
+			// checkbox, and the wrapping label makes the whole row the hit target
+			// rather than the drawn track alone.
+			const wrapper = document.createElement("label");
+			wrapper.className = "panel__control panel__control--switch";
+
+			const name = document.createElement("span");
+			name.textContent = control.label;
+
+			const side = document.createElement("span");
+			side.className = "panel__switch-side";
+
+			const readout = document.createElement("span");
+			readout.className = "panel__value";
+			// Hidden from the accessibility tree, and the label is why. It wraps both
+			// this and the name, so anything readable here joins the checkbox's
+			// accessible name — which would make it "Explosion On", a name that
+			// changes as the control is used while the checkbox's own checked state
+			// already says the same thing. The same reasoning as the panel toggle's
+			// aria-label: state belongs in the state, not in the name.
+			readout.setAttribute("aria-hidden", "true");
+
+			const input = document.createElement("input");
+			input.type = "checkbox";
+			input.className = "panel__switch";
+
+			const showValue = (value: boolean): void => {
+				readout.textContent = control.format(value);
+				readout.classList.toggle(
+					"panel__value--off",
+					control.emphasis?.(value) ?? false,
+				);
+			};
+
+			const refresh = (): void => {
+				const value = settings[control.setting];
+				input.checked = value;
+				showValue(value);
+			};
+
+			input.addEventListener("change", () => {
+				settings[control.setting] = input.checked;
+				showValue(input.checked);
+			});
+
+			refresh();
+			refreshers.push(refresh);
+
+			side.append(readout, input);
+			wrapper.append(name, side);
+			element.append(wrapper);
+			continue;
+		}
+
 		const bound: SettingBound = SETTING_BOUNDS[control.setting];
 
 		// A label wrapping its input, so the two are associated without generated

@@ -177,6 +177,117 @@
 	font-style: italic;
 }
 
+/* A switch that is off. Dimmed rather than red: switching the Explosion off is a
+ * choice about which rule is running, not a state the Viewer needs warning
+ * about, so it reads as quiet rather than as something being wrong. */
+.panel__value--off {
+	color: rgb(154 140 255 / 55%);
+}
+
+/*
+ * The switch row.
+ *
+ * Laid out along one line rather than stacked like a slider, and that is what
+ * pays for it: a control that is on or off has nothing to read along a track, so
+ * the label row and the control are the same row. At 2.75rem it is a full tap
+ * target and still shorter than the label-plus-slider a range control costs,
+ * which is what lets a seventh control into a sheet that has to survive a 320px
+ * viewport.
+ */
+.panel__control--switch {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	min-height: 2.75rem;
+	font-size: 0.78rem;
+	cursor: pointer;
+}
+
+/*
+ * No rule above the switch, and this is grouping rather than economy.
+ *
+ * It sits directly beneath Maximum age because the two are one mechanism — the
+ * age is what the Explosion triggers on, and switched off the age governs colour
+ * and nothing else. A divider between them would say they are unrelated settings
+ * that happen to share a word. The height it gives back is what lets a seventh
+ * control into a sheet a portrait phone can still show whole.
+ */
+.panel__control + .panel__control--switch {
+	padding-top: 0;
+	border-top: 0;
+}
+
+.panel__switch-side {
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+}
+
+/*
+ * Native checkbox, restyled — the same bargain as the sliders. It already
+ * answers to Space, to a tap, and to a screen reader as a checkbox, none of
+ * which a drawn switch would get for free.
+ */
+.panel__switch {
+	appearance: none;
+	flex: none;
+	position: relative;
+	width: 2.1rem;
+	height: 1.15rem;
+	margin: 0;
+	border-radius: 999px;
+	background: rgb(205 214 228 / 18%);
+	cursor: pointer;
+	transition: background-color 140ms ease-out;
+}
+
+.panel__switch::after {
+	content: "";
+	position: absolute;
+	top: 0.175rem;
+	left: 0.175rem;
+	width: 0.8rem;
+	height: 0.8rem;
+	border-radius: 50%;
+	background: #cdd6e4;
+	transition:
+		transform 140ms ease-out,
+		background-color 140ms ease-out;
+}
+
+.panel__switch:checked {
+	background: rgb(126 249 232 / 30%);
+}
+
+.panel__switch:checked::after {
+	background: #7ef9e8;
+	transform: translateX(0.95rem);
+}
+
+/* The same halo the slider thumb takes, so contact reads identically across the
+ * two control types. */
+.panel__switch:hover::after,
+.panel__switch:active::after {
+	box-shadow: 0 0 0 0.35rem rgb(126 249 232 / 18%);
+}
+
+.panel__switch:focus-visible {
+	outline: none;
+}
+
+.panel__switch:focus-visible::after {
+	box-shadow: 0 0 0 0.35rem rgb(126 249 232 / 32%);
+}
+
+/* The knob slides; with motion turned down it changes ends without travelling. */
+@media (prefers-reduced-motion: reduce) {
+	.panel__switch,
+	.panel__switch::after {
+		transition: none;
+	}
+}
+
 /*
  * Native range inputs, restyled.
  *
@@ -674,6 +785,18 @@
 		height: 1.05rem;
 	}
 
+	/*
+	 * The switch takes the slider's height rather than the 44rem a tapped control
+	 * would get, for the reason above and one more: the label wraps the input, so
+	 * the hit area is the full width of the sheet and the height is the least of
+	 * what makes it reachable. At 44px the sheet ran past a portrait phone and
+	 * scrolled, which is the #10 failure — a control that is technically large and
+	 * actually harder to get to.
+	 */
+	.panel__control--switch {
+		min-height: 2rem;
+	}
+
 	.panel__restart {
 		min-height: 2.75rem;
 	}
@@ -701,5 +824,11 @@
 	.panel__control + .panel__control {
 		margin-top: 0.35rem;
 		padding-top: 0.35rem;
+	}
+
+	/* Restated inside the query: the rule above has the same specificity and comes
+	 * later, so it would win back the padding the grouping deliberately drops. */
+	.panel__control + .panel__control--switch {
+		padding-top: 0;
 	}
 }

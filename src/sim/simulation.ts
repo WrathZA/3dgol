@@ -22,8 +22,10 @@ export type RandomSource = () => number;
 export interface SimulationOptions {
 	width: number;
 	height: number;
-	/** Age at which a live Cell dies regardless of its neighbours. */
+	/** Age at which a live Cell detonates, and the top of the Colour Gradient. */
 	maximumAge: number;
+	/** Whether reaching Maximum Age detonates. Defaults on; off is plain Conway. */
+	explosion?: boolean;
 	/** N — how many Layers of history the Stack retains. */
 	depthWindow?: number;
 	/** Proportion of positions alive at Generation 0, in [0, 1]. */
@@ -58,6 +60,7 @@ export class Simulation {
 	private scratchGrid: Grid;
 	private generationCount = 0;
 	private currentMaximumAge: number;
+	private currentExplosion: boolean;
 	private readonly seedDensity: number;
 	private readonly random: RandomSource;
 	private readonly layers: LayerStack;
@@ -76,6 +79,7 @@ export class Simulation {
 		this.currentGrid = createGrid(width, height);
 		this.scratchGrid = createGrid(width, height);
 		this.currentMaximumAge = validateMaximumAge(maximumAge);
+		this.currentExplosion = options.explosion ?? true;
 		this.seedDensity = seedDensity;
 		this.random = options.random ?? Math.random;
 		this.layers = new LayerStack(width, height, depthWindow);
@@ -113,9 +117,30 @@ export class Simulation {
 		this.currentMaximumAge = validateMaximumAge(value);
 	}
 
+	get explosion(): boolean {
+		return this.currentExplosion;
+	}
+
+	/**
+	 * Switches the Explosion for subsequent Generations.
+	 *
+	 * Takes effect on the next `advance()` and touches nothing already computed:
+	 * the Stack keeps every Layer it holds and the Run does not reseed. Switching
+	 * it on does not detonate the Cells already sitting at the cap retroactively —
+	 * they detonate at the next Generation, which is where the rule lives.
+	 */
+	set explosion(value: boolean) {
+		this.currentExplosion = value;
+	}
+
 	/** Advances the Run by one Generation, freezing it as the newest Layer. */
 	advance(): void {
-		nextGeneration(this.currentGrid, this.scratchGrid, this.currentMaximumAge);
+		nextGeneration(
+			this.currentGrid,
+			this.scratchGrid,
+			this.currentMaximumAge,
+			this.currentExplosion,
+		);
 
 		const previous = this.currentGrid;
 		this.currentGrid = this.scratchGrid;

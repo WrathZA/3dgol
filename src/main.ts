@@ -79,6 +79,7 @@ interface Run {
 	/** Live settings already pushed, against which the settings are compared. */
 	appliedSpeed: number;
 	appliedMaximumAge: number;
+	appliedExplosion: boolean;
 	appliedCellSize: number;
 	/** The Depth Window being drawn, which travels toward the setting. */
 	drawnDepthWindow: number;
@@ -115,6 +116,7 @@ function startRun(previous: Run | undefined): Run {
 		height,
 		depthWindow: settings.depthWindow,
 		maximumAge: settings.maximumAge,
+		explosion: settings.explosion,
 	});
 
 	const view = createStructureView(simulation, {
@@ -136,6 +138,7 @@ function startRun(previous: Run | undefined): Run {
 		height,
 		appliedSpeed: settings.generationsPerSecond,
 		appliedMaximumAge: settings.maximumAge,
+		appliedExplosion: settings.explosion,
 		appliedCellSize: settings.cellSize,
 		drawnDepthWindow: settings.depthWindow,
 		laidOutDepthWindow: settings.depthWindow,
@@ -264,6 +267,14 @@ function frame(now: number): void {
 		// kill them here would be a second copy of the rule.
 		run.simulation.maximumAge = settings.maximumAge;
 		run.appliedMaximumAge = settings.maximumAge;
+	}
+
+	if (settings.explosion !== run.appliedExplosion) {
+		// Nothing already drawn changes — the Stack keeps its Layers and the Run
+		// does not reseed. Switching it on leaves the Cells already at the cap to
+		// detonate on the next Generation rather than retroactively.
+		run.simulation.explosion = settings.explosion;
+		run.appliedExplosion = settings.explosion;
 	}
 
 	if (settings.cellSize !== run.appliedCellSize) {
