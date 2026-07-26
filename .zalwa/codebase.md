@@ -14,7 +14,8 @@ added staged Grid dimensions and Restart, #26 made reaching Maximum Age detonate
 laid the whole thing out for a phone, #37 made that layout survive a real one, #29 raised the starting
 Speed to 10 Generations per second, #30 made the detonation a reset rather than a death and gave the
 Viewer a switch for it, #42 added a starting-Pattern picker with Gosper's glider gun, #46 made choosing a
-Pattern switch the Explosion off so the gun is not destroyed by it, and #49 grew that list to seven.
+Pattern switch the Explosion off so the gun is not destroyed by it, #49 grew that list to seven, and #50
+put the chosen Pattern in the URL so a run can be shared.
 
 Not yet built: link previews (#13). The instance ceiling the panel permits has never been measured —
 deliberate, and owned by #12, which is now `priority:deferred` and reachable only via `/zalwa-ride 12`.
@@ -72,6 +73,7 @@ index.html            Full-viewport canvas (#viewport), meta tags, minimal inlin
 src/
   main.ts             Composition root — the Run object, rAF loop, settings diff, Restart
   settings.ts         Starting values, bounds, clamping, and the rule a Pattern imposes
+  share.ts            The URL as a share mechanism — parse a Pattern from a query, write one back
   sim/                Pure simulation — imports nothing outside itself
     grid.ts           Grid storage, index arithmetic, Bounded Edge, neighbour counting
     rules.ts          B3/S23 + saturating age + the Explosion at Maximum Age
@@ -102,6 +104,7 @@ tests/
   render/
     instances.test.ts Ring slot arithmetic and Stack placement height
   settings.test.ts    Setting bounds, step snapping, clamping, applyStartRule
+  share.test.ts       Pattern-from-query, URL building, degradation, round-trip
 biome.json            Scoped to src/, tests/, and config files only
 vite.config.ts        @/ alias + Vitest config (tests live in tests/**/*.test.ts)
 tsconfig.json         strict, noUncheckedIndexedAccess, @/ paths
@@ -242,6 +245,36 @@ every instance here is placed by the shader — leaving culling on makes the who
 error to explain it.
 
 ## Components
+
+### `src/share.ts`
+
+The URL as a share mechanism (#50), and **the only place the product accepts input from outside itself**.
+
+`patternFromQuery(search, patterns)` resolves a query string to a Pattern or `null`; `urlWithPattern(url,
+pattern)` returns that URL with the parameter set or removed. Both are pure string functions, so `main.ts`
+keeps only a `history.replaceState` call with no decision in it — the same reasoning that moved
+`applyStartRule` into `settings.ts` after #46's QA gate failed on an untestable rule.
+
+**Anything unrecognised returns `null` rather than throwing, and that is a deliberate exception to
+`stack.md`'s convention.** Programmer errors are thrown here and there is no graceful screen for a device
+without WebGL2, because those are bugs and loud failure is how bugs get fixed. A URL is different in kind:
+it arrives already mangled by chat clients, hand edits, and Patterns that existed when a link was shared and
+do not now. A shared link that renders a stack trace has destroyed the one moment it existed for. If a
+future session sees the `?? null` and reaches for a throw, this is the reason not to.
+
+**Matching is `patterns.find((p) => p.id === requested)`, and the shape matters beyond style.** It compares
+a *value*, so attacker-supplied text never becomes a property key — `?pattern=__proto__` is inert. Rewritten
+as `patterns[requested]` or a lookup map keyed by id, prototype pollution becomes a live question again. The
+security review for #50 assessed this specifically; the linear scan is the safe form and there are seven
+Patterns, so there is no performance case for changing it.
+
+**The URL is synced to what actually started, not to what was asked for.** `main.ts` calls `urlWithPattern`
+at boot as well as on every Restart, so a link naming a Pattern this build does not have degrades to a
+random Run *and* loses the parameter. Without that, the address bar would keep claiming a Pattern the Run is
+not using, and a Viewer copying it would pass the broken link on. Unit tests cannot see this — it is a
+property of the wiring between two correct functions — and it was found by driving a real browser.
+
+Exposes: `PATTERN_PARAM`, `patternFromQuery`, `urlWithPattern`.
 
 ### `src/sim/grid.ts`
 
@@ -522,6 +555,11 @@ Window travel values, and the time accumulator — is deliberate. Held separatel
 resetting each of them, and forgetting one fails severely and traces back poorly: stale travel state re-lays
 a ring that no longer exists, and a stale accumulator discharges the previous Run's banked time into the new
 one. Replacing an object cannot half-happen.
+
+**Boot reads the URL before anything starts (#50).** `patternFromQuery(window.location.search, PATTERNS)`
+runs before `applyStartRule` and before the first `startRun`, so a shared Pattern arrives under the same
+Explosion rule a dropdown choice gets — one path, not two. A Pattern that behaved differently depending on
+how it was chosen would be a defect nobody would think to look for.
 
 **`applyStartRule` is called before `restartRun`, and the ordering is load-bearing (#46).** It writes
 `settings.explosion = false` when the Restart carries a Pattern. Both paths then pick it up without extra
