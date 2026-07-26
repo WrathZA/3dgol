@@ -13,10 +13,71 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <title>3D Game of Life</title>
+    <!--
+      "3D Game of Life" already names a well-known and completely different
+      thing — Life on a three-dimensional lattice, 26 neighbours, rules like
+      5766. Somebody arriving from a link with that expectation will misread
+      what they are looking at, so the title carries the correction rather than
+      leaving it to the description, which search results truncate and chat
+      previews sometimes drop entirely.
+    -->
+    <title>3D Game of Life — the third dimension is time</title>
     <meta
       name="description"
-      content="Conway's Game of Life with the time axis drawn — each generation stacked as a layer."
+      content="Conway's Game of Life with the time axis drawn — not a 3D cellular automaton. Each generation is laid down as a layer, so the structure you fly around is the pattern's own history."
+    />
+
+    <!--
+      One canonical address, matching the apex-only route in wrangler.jsonc.
+      The workers.dev fallback serves this same page, and without this tag a
+      search engine finding both would have two URLs competing for one product.
+    -->
+    <link rel="canonical" href="https://goluniverse.cc/" />
+
+    <!--
+      The card a link draws in Slack, Discord, or a message.
+
+      Absolute URLs, and that is the part which quietly breaks: a card is
+      rendered by a crawler that has only the markup, so a root-relative
+      `/og-image.png` resolves against nothing and the card arrives without an
+      image. The image itself is a captured frame of a real run — see
+      `e2e/og-capture.mjs`, which recaptures it — because a logo or a mockup
+      would promise something the product does not do.
+
+      Width and height are declared so the platform can reserve the large card
+      before it has fetched the image; without them the first render of a link
+      is often the small square one.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="3D Game of Life" />
+    <meta property="og:url" content="https://goluniverse.cc/" />
+    <meta
+      property="og:title"
+      content="3D Game of Life — the third dimension is time"
+    />
+    <meta
+      property="og:description"
+      content="Conway's Game of Life with the time axis drawn — not a 3D cellular automaton. Each generation is laid down as a layer, so the structure you fly around is the pattern's own history."
+    />
+    <meta property="og:image" content="https://goluniverse.cc/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="A tall lattice of glowing cyan and blue cubes on a near-black background — sixty generations of Conway's Game of Life stacked one above the next, dissolving at the bottom as the oldest layers retire."
+    />
+
+    <!--
+      X reads the Open Graph tags above for everything except the card size, so
+      only the two it has no equivalent for are repeated here. Duplicating the
+      title and description would create a second copy to keep in step, and the
+      copy that drifts is always the one nobody is looking at.
+    -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image:alt"
+      content="A tall lattice of glowing cyan and blue cubes on a near-black background — sixty generations of Conway's Game of Life stacked one above the next, dissolving at the bottom as the oldest layers retire."
     />
     <style>
       html,
