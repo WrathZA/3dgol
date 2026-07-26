@@ -1,0 +1,10 @@
+# Everything, to everyone. The product is one public page with nothing behind
+# it — no accounts, no server, no paths other than `/` — so there is nothing a
+# crawler could reach that a Viewer could not.
+#
+# Stated rather than left to the default: `not_found_handling: "404-page"` in
+# wrangler.jsonc means a request for this file would otherwise return the 404
+# page, and a crawler reading an HTML error where a robots file should be is
+# one interpretation away from indexing nothing.
+User-agent: *
+Allow: /
