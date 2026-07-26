@@ -33,7 +33,8 @@ let panelsBuilt = 0;
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
 /**
- * The control surface: the settings the Viewer can move, and the Restart button.
+ * The control surface: the settings the Viewer can move, and the two ways to
+ * start a fresh Run — a Pattern from a fixed list, or a random Seed.
  *
  * This module mutates plain objects and does nothing else. It knows nothing about
  * the Simulation or the renderer, and neither knows about it — whoever composed

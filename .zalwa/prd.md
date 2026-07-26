@@ -130,6 +130,11 @@ Applied immediately, without disturbing the run in progress:
 - **Cell size** — how large each cell is drawn, and therefore whether layers read as porous scatters or
   solid sheets.
 
+Chosen per run, applied immediately by starting one:
+
+- **Starting pattern** — which named arrangement generation 0 holds, or a random seed. Selecting one starts
+  a fresh run; it does not alter the run in progress.
+
 Applied on restart:
 
 - **Grid dimensions** — the width and height of the 2D simulation grid.
@@ -173,12 +178,18 @@ Responsibilities:
 - Sets how large cells are drawn.
 - Sets the grid dimensions, which apply on the next restart.
 - Moves the camera — orbits, pans, and zooms around the structure while it builds, by pointer or by touch.
-- Restarts the run, which reseeds the grid randomly.
+- Starts a fresh run, either from a new random seed or from a pattern chosen from a fixed list.
 
 **This list of one is intentional, not an omission.** There is no author, curator, admin, or publisher role
 in v1. The opening state is a randomly seeded grid, not a hand-picked arrangement, so nobody occupies the
-role of "person who chose what you see first" — randomness does. A curated pattern list would introduce a
-distinct authoring role and is deferred (see Out of Scope).
+role of "person who chose what you see first" — randomness does. That still holds now that patterns exist,
+because a fresh page load ignores them: a visitor arriving for the first time sees a random seed, and only
+their own subsequent choice changes that.
+
+The pattern list narrows the claim rather than breaking it. What would introduce an authoring role is
+*composing* a pattern — deciding what someone else's run contains — and that stays out of scope, along with
+drawing cells. Picking from a fixed list the product ships is a choice about what you yourself watch next,
+which every other control already is. The list is content, not a role.
 
 ## Domain Objects
 
@@ -274,15 +285,36 @@ The live running state, distinct from the frozen history in the stack.
 
 ### Seed
 
-The initial state a run begins from.
+The initial state a run begins from — either a random scatter or a named pattern.
 
 | Field | Meaning |
 |-------|---------|
-| `density` | Proportion of grid positions alive at generation 0 |
+| `density` | Proportion of grid positions alive at generation 0, when the seed is random |
+| `pattern` | The named arrangement generation 0 holds instead, when one was chosen |
 
-v1 seeds randomly at a fixed default density. Reseeding happens as part of a restart (B8) — the Viewer
-chooses *when* a new seed is generated, never *what* it contains. There is no pattern picker and no cell
-drawing in v1 (see Out of Scope).
+A fresh page load always seeds randomly at a fixed default density, and so does the Random control.
+Choosing a pattern seeds from that pattern instead. Either way seeding happens as part of a restart (B8).
+
+The Viewer chooses *when* a new seed is generated and *which of a fixed list* it comes from — never what a
+pattern contains. Patterns cannot be composed, edited, or drawn cell by cell (see Out of Scope), which is
+the line that keeps a pattern picker from being an authoring tool.
+
+### Pattern
+
+A named arrangement of live cells the product ships, offered as a starting point.
+
+| Field | Meaning |
+|-------|---------|
+| `name` | What the Viewer sees in the control |
+| `cells` | The live positions the pattern draws, at age 1 |
+
+Patterns are fixed content, not Viewer data: the list is the same for everyone and cannot be added to from
+inside the product. A pattern is placed toward one corner rather than centred, because what a pattern
+*emits* needs somewhere to travel before the bounded edge destroys it — and for a glider gun that travel is
+the entire point.
+
+Grid dimensions have a floor high enough to hold every pattern shipped, so no pattern can ever be clipped
+and no selection has to be refused.
 
 ### Display Configuration
 
@@ -365,10 +397,19 @@ structure becomes visible through the gaps. The camera does not move.
 The Viewer changes width or height → the change is accepted but does not alter the current run, and the
 interface indicates the new dimensions apply on restart. On restart (B8), the new run uses them.
 
-### B8 — Restart the run
+### B8 — Start a fresh run
 
-The Viewer restarts → the stack clears, the generation counter returns to 0, the grid reseeds randomly,
-and layers begin accumulating again from an empty space using the currently configured dimensions.
+The Viewer presses **Random** → the stack clears, the generation counter returns to 0, the grid reseeds
+randomly, and layers begin accumulating again from an empty space using the currently configured
+dimensions.
+
+The Viewer chooses a **pattern** → exactly the same thing happens, except that generation 0 holds that
+pattern and nothing else. Choosing the same pattern a second time starts it again rather than doing
+nothing, so a pattern can be watched from the beginning as often as the Viewer likes.
+
+Both paths are restarts in every sense that matters: staged grid dimensions apply, the stack empties, and
+the counter returns to 0. Only the contents of generation 0 differ. The behaviour is named for starting a
+run rather than for restarting one, because a pattern selection is not a repeat of anything.
 
 ### B9 — Navigate the structure
 
@@ -451,9 +492,10 @@ The following are deliberately not built in v1.
    a permanent non-goal, not a deferral — the third axis is time, and making it space would delete the
    product's premise.
 
-3. **Curated pattern library.** No list of named starting patterns (glider gun, pulsar, and so on). Runs
-   always begin from a random seed. **Deferred rather than rejected** — a curated list is of interest for
-   a later version, and would introduce an authoring role that v1 has no actor for.
+3. **Composing or editing a pattern.** The Viewer picks from a fixed list the product ships and cannot add
+   to it, alter an entry, or place cells to build one. The list itself is no longer excluded — it was
+   marked "deferred rather than rejected" and has since been built — but the *authoring* half stays out,
+   and that is what keeps the Actors list at one. Nobody gains the ability to decide what anyone else sees.
 
 4. **Drawing or editing cells.** The Viewer cannot place, erase, or paint cells. The only way to influence
    the starting state is to restart and get a different random seed.
@@ -474,8 +516,11 @@ The following are deliberately not built in v1.
 Some values are fixed defaults in v1 rather than product decisions, and their exact numbers are settled by
 experiment rather than specified here:
 
-- **Default grid dimensions** — the Viewer can change them; the starting value is chosen by what looks
-  best at typical viewing distance.
+- **Default grid dimensions** — 50 × 50. The Viewer can raise them, but not lower them: this is also the
+  floor, because the grid has to hold the largest pattern shipped and Gosper's glider gun is 36 × 9. It
+  suits the default depth window as well as the pattern list — a glider gets about fourteen columns of
+  diagonal travel before the bounded edge, roughly 56 generations, so its streak very nearly spans the 60
+  layers on screen rather than stopping part-way up.
 - **Seed density** — the proportion of cells alive at generation 0. Not a Viewer control in v1; the value
   is tuned so a fresh run reliably produces interesting movement rather than dying out or overcrowding.
 
