@@ -14,8 +14,9 @@ added staged Grid dimensions and Restart, #26 made reaching Maximum Age detonate
 laid the whole thing out for a phone, #37 made that layout survive a real one, #29 raised the starting
 Speed to 10 Generations per second, #30 made the detonation a reset rather than a death and gave the
 Viewer a switch for it, #42 added a starting-Pattern picker with Gosper's glider gun, #46 made choosing a
-Pattern switch the Explosion off so the gun is not destroyed by it, #49 grew that list to seven, and #50
-put the chosen Pattern in the URL so a run can be shared.
+Pattern switch the Explosion off so the gun is not destroyed by it, #49 grew that list to seven, #50
+put the chosen Pattern in the URL so a run can be shared, and #51 removed the Cell Size control so Cells
+are always drawn at the full lattice spacing.
 
 Not yet built: link previews (#13). The instance ceiling the panel permits has never been measured —
 deliberate, and owned by #12, which is now `priority:deferred` and reachable only via `/zalwa-ride 12`.
@@ -86,7 +87,7 @@ src/
     instances.ts      Instanced geometry, GLSL shaders, ring slot arithmetic, uniforms
     structure.ts      Binds a Run's Stack to the instance buffer; re-lays the ring
   ui/                 Control surface — mutates settings, knows nothing else
-    panel.ts          Seven settings, the Pattern chooser and Random, the toggle, the 100dvh layer
+    panel.ts          Six settings, the Pattern chooser and Random, the toggle, the 100dvh layer
     panel.css         Both arrangements — desktop column, small-viewport sheet, coarse-pointer targets
     signature.ts      The author's mark — original SVG, links out to GitHub
 e2e/
@@ -172,9 +173,9 @@ so a value is live mid-drag. `main.ts` compares a handful of scalars per frame a
 and acts on the difference — constant work regardless of instance count. Nothing observes, subscribes, or
 notifies: the interface would otherwise need opinions about what each setting affects.
 
-**Live settings versus staged settings.** Speed, Depth Window, Maximum Age, the Explosion, and Cell Size
-reach the Run on the next frame. Grid width and height are *staged* — read only when a Run starts, because a
-Layer computed at one Grid size cannot coherently stack on Layers computed at another. The six numeric
+**Live settings versus staged settings.** Speed, Depth Window, Maximum Age, and the Explosion reach the
+Run on the next frame. Grid width and height are *staged* — read only when a Run starts, because a
+Layer computed at one Grid size cannot coherently stack on Layers computed at another. The five numeric
 settings are bounded in the same table; being bounded and being applied immediately are separate questions.
 The Explosion has no entry there, because a boolean has no range — which is why `SETTING_BOUNDS` and
 `clampSettings` stay numeric and `panel.ts` derives its switch-able settings from the `Settings` type
@@ -217,7 +218,7 @@ would discard the main advantage of this design.
 
 **Implemented in #6, completed in #9.** Each instance carries its grid position (written once), birth
 generation, and age. Per frame, exactly two uniforms change: `uCurrentGeneration` and `uLayerCount`.
-Viewer settings change three more, but only when moved. The vertex shader derives:
+Viewer settings change two more, but only when moved. The vertex shader derives:
 
 | Derived | From | State |
 |---------|------|-------|
@@ -225,7 +226,7 @@ Viewer settings change three more, but only when moved. The vertex shader derive
 | Visibility | Age above zero, birth generation written, and depth inside the window | built |
 | Dissolve | A fade toward `BACKGROUND_COLOR` plus a shrink, both over depth | built |
 | Colour | Age along `GRADIENT_STOPS`, curved by `AGE_GRADIENT_CURVE` | built |
-| Scale | `uCellSize`, scaling a unit cube | built |
+| Scale | None — the cube is built at `CELL_SPACING`, so live Cells touch; dead Cells and retired Layers collapse to zero | built |
 
 `uLayerCount` is **not** simply the Stack's held depth — see `drawnLayerCount`. A narrowed Depth Window
 travels toward its new value while the Stack still holds the Layers being given up, so the height Layers
@@ -480,12 +481,17 @@ dissolve becomes a visible grey floor.**
 
 Owns the single instanced draw and the shaders that place it.
 
-**`DEFAULT_CELL_SIZE` (0.55) is the most consequential number in the codebase.** On an isotropic lattice
-it sets the gap in every direction at once. Near 1, Cells touch and the Stack fuses into one solid mass —
-history becomes invisible, which is the one thing this product exists to show. This was shipped wrong once
-and caught only by screenshotting it; every automated check passed. Since #9 it is a Viewer control and a
-`uCellSize` uniform scaling a unit cube, so it is now a *default* rather than a constant — and a Viewer can
-deliberately drive the Stack to that solid mass, which is the point of the control.
+**Cell size is no longer a number at all (#51).** The cube is built at `CELL_SPACING` and the vertex
+shader applies no size factor, so neighbouring live Cells touch. It was a Viewer control from #9 to #51,
+defaulting to 0.55 and scaling a unit cube through a `uCellSize` uniform, on the reasoning that near 1 the
+Stack fuses into one solid mass and history becomes invisible.
+
+That reasoning assumed a dense Grid and the measured one is not: 3–7% live at the defaults, nearer 2% on a
+Pattern run. At that density full size produces chunky connected clusters rather than filled Layers, so
+what #51 surrendered was the *porous* reading — seeing the interior through gaps — rather than legibility,
+and it bought a row of panel height that #37, #30 and #42 had each fought for. **Full size is the absence
+of a factor, not a factor of 1.0**: there is no `CELL_SIZE` constant to find, because the geometry already
+spans the lattice spacing. The reasoning for wanting the control back lives in #51 and its history entry.
 
 **Two windows, not one.** `setDepthWindow` sets what the shader fades and cuts against and takes fractional
 values, because it is eased. `setSlotCount` sets how many ring slots are drawn and must cover every slot
@@ -584,8 +590,9 @@ should not throw away where they were standing.
 
 ### `src/ui/panel.ts`
 
-Seven settings — six sliders and a switch — plus the two ways to start a fresh Run: a Pattern chooser and
-the Random button, sharing one row. Mutates plain objects; imports nothing from `sim/` or `render/` **at
+Six settings — five sliders and a switch — plus the two ways to start a fresh Run: a Pattern chooser and
+the Random button, sharing one row. Since #51 the portrait sheet fits at exactly `contentHeight` 516 of
+`visibleHeight` 516, so there is no headroom left: the next control added overflows it again. Mutates plain objects; imports nothing from `sim/` or `render/` **at
 runtime**.
 
 That last qualifier is load-bearing since #42. The panel needs to know what a `Pattern` *is* to hand one
