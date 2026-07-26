@@ -78,7 +78,7 @@ is therefore always fully used, and the Viewer can read a region's remaining lif
 **A defaults to its own maximum, and that is a deliberate choice against the reasoning above.** A high A
 behaves closer to classic Conway, which is the behaviour the age cap was introduced to prevent — so for the
 first A generations of a run, nothing explodes and the population decays. At the default, the first
-explosion arrives around generation 214, roughly half a minute in at the default speed. What that buys is
+explosion arrives around generation 214, roughly twenty seconds in at the default speed. What that buys is
 the sparse and dramatic reading: ages spread right across the palette instead of bunching young, pillars
 grow tall enough to be worth losing, and their explosions are events rather than weather. A viewer who
 wants immediacy lowers the slider, which is a single movement. This paragraph exists so that a later
@@ -289,7 +289,7 @@ is already building when the page settles.
 
 ### B2 — Control speed
 
-- #29 feat: the run starts at 15 generations per second
+- #29 feat: the run starts at 10 generations per second
 
 The Viewer raises the speed → generations visibly advance more frequently and the structure grows upward
 faster. Lowers it → generations advance less frequently and growth slows. The change takes effect on the
