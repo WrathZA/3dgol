@@ -111,13 +111,21 @@ export type BoundedSetting = keyof typeof SETTING_BOUNDS;
  *
  * Maximum Age starts at its own ceiling, which is the one default here chosen
  * for character rather than for comfort — see `SETTING_BOUNDS.maximumAge`.
+ *
+ * Speed is 10 rather than something nearer the top of its range because the
+ * structure has to stay legible while it builds. Past a certain rate a Layer is
+ * on screen too briefly to be read as a shape, and the eye takes the whole thing
+ * as motion — which works against the reason the third axis is time at all. 10
+ * is fast enough that the first Explosion arrives around twenty seconds in
+ * rather than twenty-seven, and slow enough that a Layer holds for six seconds
+ * at the default Depth Window.
  */
 export const DEFAULT_SETTINGS: Settings = {
 	gridWidth: 48,
 	gridHeight: 48,
 	depthWindow: 60,
 	maximumAge: 200,
-	generationsPerSecond: 8,
+	generationsPerSecond: 10,
 	cellSize: 0.55,
 };
 
