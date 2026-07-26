@@ -7,6 +7,11 @@ import {
 	type SettingBound,
 	type Settings,
 } from "@/settings";
+// Type-only, and deliberately so: the panel needs to know what a Pattern *is* to
+// hand one back on the Restart request, but not which ones exist. The list is
+// passed in by the composition root, so this module still imports nothing from
+// the Simulation at runtime.
+import type { Pattern } from "@/sim/patterns";
 import { createSignatureMark } from "@/ui/signature";
 
 /** Where the mark points. The product's only outbound link. */
@@ -60,9 +65,17 @@ export interface ControlPanel {
 	dispose(): void;
 }
 
-/** The Restart request the loop consumes. Raised here, lowered there. */
+/**
+ * The Restart request the loop consumes. Raised here, lowered there.
+ *
+ * `pattern` is what Generation 0 will hold — `null` for a random Seed, which is
+ * what Random asks for. Carried on the request rather than held as panel state
+ * because a Pattern is chosen *for one Restart*: the next Random must not
+ * silently reuse the last Pattern picked.
+ */
 export interface RestartRequest {
 	requested: boolean;
+	pattern: Pattern | null;
 }
 
 /** Grid dimensions of the Run actually in progress, as opposed to staged. */
@@ -79,6 +92,15 @@ export interface ControlPanelOptions {
 	 * staged dimension change *will* do without knowing when a Restart happens.
 	 */
 	runningGrid?: () => RunningGrid;
+	/**
+	 * Starting arrangements to offer, in the order they are listed.
+	 *
+	 * Supplied rather than imported so the panel has no opinion about which
+	 * Patterns exist — the composition root owns that. Empty means the Pattern
+	 * control is not built at all, which is what keeps a panel with no Patterns
+	 * from showing an empty dropdown.
+	 */
+	patterns?: readonly Pattern[];
 	parent?: HTMLElement;
 }
 
