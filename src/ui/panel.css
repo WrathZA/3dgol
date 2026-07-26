@@ -29,6 +29,14 @@
 	padding: 1rem 1.1rem 1.15rem;
 
 	/*
+	 * Without this, `max-height` below bounds the *content* box and the padding and
+	 * border sit outside it, so the panel overruns its own cap by about 36px and
+	 * the last control goes under the edge of the window — the exact failure the
+	 * cap exists to prevent, silently reintroduced by the default box model.
+	 */
+	box-sizing: border-box;
+
+	/*
 	 * The panel is fixed, so anything past the bottom of the viewport is simply
 	 * unreachable — there is no page to scroll. With six controls and a button it
 	 * is tall enough that a short window puts Restart off the end, so it is bounded
@@ -478,6 +486,18 @@
 		left: 0.75rem;
 		width: auto;
 
+		/*
+		 * Wide enough to fill a phone in portrait and no wider. In landscape the
+		 * gutters are 820px apart, and a sheet that took all of it would turn every
+		 * slider into an 800px sweep of the thumb and leave two controls on screen
+		 * with the rest below the fold — while covering the Structure completely.
+		 * Capped and pushed to the right edge, it stays a sheet instead of becoming
+		 * a wall, and most of the Structure is still there to watch while a slider
+		 * is being moved.
+		 */
+		max-width: 24rem;
+		margin-left: auto;
+
 		display: flex;
 		flex-direction: column;
 
@@ -488,21 +508,47 @@
 		 */
 		max-height: calc(100dvh - 5rem);
 
-		/* Out of the way until asked for, and out of the tab order with it.
-		 * `visibility` rather than `display` so there is something to animate. */
+		/*
+		 * Out of the way until asked for, and out of the tab order with it —
+		 * `visibility`, not `opacity` alone, or every control stays tabbable behind
+		 * a sheet that is not there.
+		 *
+		 * Nothing here is transitioned, and that is deliberate rather than
+		 * unfinished. A transition is created when the class changes but only runs
+		 * once the compositor assigns it a start time, and this page can leave it
+		 * pending indefinitely — a WebGL canvas redrawing every frame under a
+		 * `backdrop-filter` surface is exactly that load. Measured after a tap:
+		 * `getAnimations()` reported every transitioned property `running` with
+		 * `startTime: null` and `currentTime: 0`, so the sheet held its *closed*
+		 * values forever and the tap looked ignored.
+		 *
+		 * A stuck transition always strands the from-value, so there is no property
+		 * that is safe to ease here: opacity stuck at 0 is an invisible panel, and
+		 * a stuck translate is a panel 12px out of place, overlapping the control
+		 * that dismisses it. The version of this rule that slid the sheet up was
+		 * written, measured, and removed for exactly that.
+		 *
+		 * The instinct on reading this will be to put the motion back. Confirm the
+		 * transition actually starts on a device under load first — a slide that
+		 * works on a desktop is not evidence.
+		 */
 		visibility: hidden;
 		opacity: 0;
-		transform: translateY(0.75rem);
-		transition:
-			opacity 160ms ease-out,
-			transform 160ms ease-out,
-			visibility 160ms;
 	}
 
 	.panel--open {
 		visibility: visible;
 		opacity: 1;
-		transform: none;
+	}
+
+	/*
+	 * The sheet scrolls, so its contents must keep their own height. Flex items
+	 * shrink by default, and content taller than the sheet makes every one of them
+	 * a candidate: the dismiss control collapsed from 44px to the 16px of its icon,
+	 * which is a target too small to hit and no longer square.
+	 */
+	.panel > * {
+		flex-shrink: 0;
 	}
 
 	.panel__toggle {
@@ -576,16 +622,5 @@
 	.panel__control + .panel__control {
 		margin-top: 1.15rem;
 		padding-top: 1.15rem;
-	}
-}
-
-/*
- * Motion is a courtesy, not a requirement. The sheet still appears and still
- * dismisses; it simply stops sliding.
- */
-@media (prefers-reduced-motion: reduce) {
-	.panel {
-		transition: none;
-		transform: none;
 	}
 }
