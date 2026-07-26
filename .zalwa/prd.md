@@ -24,6 +24,8 @@ Concretely, a person watching a 2D Game of Life today cannot:
 
 ## Solution and Scope
 
+- #32 feat: sign the panel with a link to the author's GitHub
+
 A browser-based viewer that runs a 2-dimensional Game of Life and renders its history as a 3-dimensional
 structure. The third axis is **time, not space**: each computed generation is laid down as a horizontal
 layer, and successive generations stack upward. The viewer flies around the accumulated structure while
