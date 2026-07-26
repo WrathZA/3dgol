@@ -10,15 +10,21 @@ walk around, adjust, resize, and start over.
 Issue #3 scaffolded the project and proved the deployment path. #4 built the simulation, #5 the bounded
 history window, #6 drew it, #8 gave it colour, fade, and cubic edge-drawn cells, #7 made it something you
 can walk around, #9 gave it a control panel for Speed, Depth Window, Maximum Age, and Cell Size, #10
-added staged Grid dimensions and Restart, #26 made Death by Old Age detonate, and #32 signed the panel.
+added staged Grid dimensions and Restart, #26 made Death by Old Age detonate, #32 signed the panel, and
+#11 laid the whole thing out for a phone.
 
-Not yet built: phone layout (#11), the drawing budget (#12), and link previews (#13). The panel's layout is
-desktop-shaped — it scrolls rather than fits on a short viewport — and the instance ceiling it permits has
-never been measured. Both deliberate, and owned by those issues.
+Not yet built: the drawing budget (#12) and link previews (#13). The instance ceiling the panel permits has
+never been measured — deliberate, and owned by #12.
 
 Queued behind those: the Colour Gradient reads near-monochrome at the A=200 default (#28), Speed's default
-moves to 15 (#29), the Explosion gains an off switch (#30), and the Grid ceiling rises to 128 (#31, blocked
-on #12).
+moves to 15 (#29), the Explosion gains an off switch (#30), the Grid ceiling rises to 128 (#31, blocked
+on #12), the author's mark is under the contrast threshold at rest (#35), and `pnpm smoke` writes a
+screenshot to the repo root that is not gitignored (#34).
+
+**The panel has no automated coverage at all.** `vitest` runs in `environment: "node"` with no DOM, so
+nothing in `src/ui/` is reachable by a unit test — the phone layout is verified only by a local
+`pnpm smoke --phone` run that never executes in CI. #25 owns that harness, and until it lands every
+interface change is guarded by a screenshot and a pair of eyes.
 
 What is built:
 
@@ -30,7 +36,7 @@ What is built:
 | Lint / format | Biome 2.5.5, pinned exact, scoped to `src/`, `tests/`, and config files |
 | Tests | Vitest 4.1.10 — one toolchain smoke test |
 | 3D | three.js 0.185.1 on `WebGLRenderer`, `@types/three` at a matching version |
-| Headless check | Playwright 1.62 — `pnpm smoke`, local only |
+| Headless check | Playwright 1.62 — `pnpm smoke` and `pnpm smoke --phone`, local only |
 | Deploy | Cloudflare Workers static assets via Wrangler |
 | Live URL | https://goluniverse.cc — apex only; `www` deliberately does not resolve |
 | Fallback URL | https://3dgol.miller-brettm.workers.dev — kept live alongside the custom domain |
@@ -59,11 +65,11 @@ src/
     instances.ts      Instanced geometry, GLSL shaders, ring slot arithmetic, uniforms
     structure.ts      Binds a Run's Stack to the instance buffer; re-lays the ring
   ui/                 Control surface — mutates settings, knows nothing else
-    panel.ts          Six controls plus Restart, built from native range inputs
-    panel.css         Panel styling, including the viewport height bound
+    panel.ts          Six controls plus Restart, the sheet toggle, built from native range inputs
+    panel.css         Both arrangements — desktop column, small-viewport sheet, coarse-pointer targets
     signature.ts      The author's mark — original SVG, links out to GitHub
 e2e/
-  smoke.mjs           Headless render + screenshot — local only, never CI
+  smoke.mjs           Headless render + screenshot; `--phone` checks the sheet in both orientations
 tests/
   sim/
     helpers.ts        Pattern-to-Grid fixtures and comparison helpers (not a test file)
@@ -428,12 +434,51 @@ it, and clamping is applied on every write so a value off the step never reaches
 
 **The panel is bounded to the viewport height and scrolls inside itself.** It is `position: fixed`, so
 anything past the bottom of the viewport is unreachable — there is no page to scroll. With six controls and a
-button it exceeds a short window, and the control that fell off the end was Restart. Adding a seventh control
-without checking a short viewport reintroduces that, and nothing automated guards it.
+button it exceeds a short window, and the control that fell off the end was Restart. `pnpm smoke --phone`
+now guards this in both orientations; nothing guards it at desktop sizes.
+
+The cap is in `dvh` and the panel is `border-box`, and both were bugs. `vh` measures a phone's viewport as
+if the browser toolbar were already collapsed, so a bound in `vh` still puts Restart underneath it. And
+`max-height` bounds the *content* box by default, so the panel overran its own cap by its padding and
+border — about 36px — which is the failure the cap exists to prevent, silently reintroduced by the default
+box model. A cap that does not cap is worse than no cap, because it reads as handled.
+
+**Two arrangements, and `panel.css` alone decides which applies (#11).** Below `40rem` wide *or* `30rem`
+tall the panel becomes a sheet along the bottom, width-capped, closed until a toggle asks for it; above
+that it is the desktop column and the toggle does not exist. `panel.ts` holds one boolean and writes one
+`panel--open` class — whether the *absence* of that class means "hidden" or means nothing at all is a
+stylesheet decision. That is why a rotation needs no listener and why there is no `matchMedia` in the
+interface: putting the breakpoint in both places would mean keeping two definitions in agreement.
+
+Width *or* height, because a phone in landscape is not narrow, it is short — 844 × 320 — and the desktop
+column fails there by being taller than the window rather than by being too wide.
+
+**Touch targets are keyed on `pointer: coarse`, never on viewport width.** Different questions, different
+answers: a tablet is wide enough for the desktop column and is still operated by thumb, while a narrow
+desktop window is small and still has a mouse. Only the *hit* area grows to 44px — the visible track stays
+2px, because the problem is where a tap lands, not what the panel looks like.
+
+**Nothing about the sheet's appearance is transitioned, and that is load-bearing.** The first version eased
+`opacity`, `transform`, and `visibility`, and the sheet never opened. A transition is created when the class
+changes but only runs once the compositor assigns it a start time, and this page can leave it pending
+indefinitely — a WebGL canvas redrawing every frame under a `backdrop-filter` surface is exactly that load.
+Measured after a tap, `getAnimations()` reported all three properties `running` with `startTime: null` and
+`currentTime: 0`, so the panel held its *closed* values forever and the tap looked ignored. A stuck
+transition always strands the from-value, so no property here is safe to ease: opacity stuck at 0 is an
+invisible panel, a stuck translate is a panel overlapping the control that dismisses it. Both were measured,
+in that order. Before adding motion back, confirm the transition actually starts on a device under load.
+
+**The sheet is a flex column, so its children need `flex-shrink: 0`.** Content taller than the sheet makes
+every child a shrink candidate; the dismiss control collapsed from 44px to the 16px of its icon.
 
 Note for anything positioning inside the panel: **`backdrop-filter` makes `.panel` a containing block for
 `position: fixed` descendants.** A fixed child does not escape to the viewport, it anchors to the panel.
-This cost a confusing debugging round during #32.
+This cost a confusing debugging round during #32, and it is why the sheet toggle is a *sibling* of the
+panel rather than a child — as a child it would travel out of view with the thing it is meant to reveal.
+
+The panel's `id` is per-instance (`structure-controls-1`, `-2`, …). `aria-controls` takes an id and nothing
+else, but a fixed one would cost the property that the panel is safe to build more than once — which is
+exactly what a DOM test harness does.
 
 ### `src/ui/signature.ts`
 
