@@ -13,7 +13,8 @@ can walk around, #9 gave it a control panel for Speed, Depth Window, Maximum Age
 added staged Grid dimensions and Restart, #26 made reaching Maximum Age detonate, #32 signed the panel, #11
 laid the whole thing out for a phone, #37 made that layout survive a real one, #29 raised the starting
 Speed to 10 Generations per second, #30 made the detonation a reset rather than a death and gave the
-Viewer a switch for it, and #42 added a starting-Pattern picker with Gosper's glider gun.
+Viewer a switch for it, #42 added a starting-Pattern picker with Gosper's glider gun, and #46 made
+choosing a Pattern switch the Explosion off so the gun is not destroyed by it.
 
 Not yet built: link previews (#13). The instance ceiling the panel permits has never been measured —
 deliberate, and owned by #12, which is now `priority:deferred` and reachable only via `/zalwa-ride 12`.
@@ -70,7 +71,7 @@ Everything under "Planned layout" below that is not listed above is still unbuil
 index.html            Full-viewport canvas (#viewport), meta tags, minimal inline CSS
 src/
   main.ts             Composition root — the Run object, rAF loop, settings diff, Restart
-  settings.ts         Starting values, bounds for every setting, clamping
+  settings.ts         Starting values, bounds, clamping, and the rule a Pattern imposes
   sim/                Pure simulation — imports nothing outside itself
     grid.ts           Grid storage, index arithmetic, Bounded Edge, neighbour counting
     rules.ts          B3/S23 + saturating age + the Explosion at Maximum Age
@@ -94,12 +95,12 @@ tests/
     grid.test.ts      Dimensions, Bounded Edge, neighbour counting
     rules.test.ts     Golden Life patterns, Age semantics, saturation, the Explosion
     stack.test.ts     Retirement, Depth Window resize, constant memory, copy-not-reference
-    simulation.test.ts Run lifecycle, Seed density, determinism, Maximum Age, the Explosion, Stack
+    simulation.test.ts Run lifecycle, Seed density, determinism, Explosion, Pattern seeding, Stack
+    patterns.test.ts  Pattern measurement, ragged rows, the Grid floor holding every Pattern
     clock.test.ts     Pause banks nothing, resume has no burst, long gaps are capped
   render/
     instances.test.ts Ring slot arithmetic and Stack placement height
-    patterns.test.ts  Pattern measurement, ragged rows, the Grid floor holding every Pattern
-  settings.test.ts    Setting bounds, step snapping, clamping
+  settings.test.ts    Setting bounds, step snapping, clamping, applyStartRule
 biome.json            Scoped to src/, tests/, and config files only
 vite.config.ts        @/ alias + Vitest config (tests live in tests/**/*.test.ts)
 tsconfig.json         strict, noUncheckedIndexedAccess, @/ paths
@@ -178,6 +179,17 @@ instead.
 The starting **Pattern** is a third kind: not live, not staged, and not a setting at all. It never sits in
 the settings object — it travels on the Restart request and is consumed by the Run it starts, because it
 describes one Run's Generation 0 rather than a value the product holds.
+
+**It does, however, write into the settings object (#46).** Choosing a Pattern switches the Explosion off,
+via `applyStartRule` in `settings.ts`. This is the only place in the product where one control moves
+another, and the justification is specific rather than general: a Pattern describes a Run, so the rule that
+Run needs is part of what was chosen. Random is not symmetric and deliberately touches nothing — see B12a
+for the standard any future exception has to meet.
+
+**`applyStartRule` lives in `settings.ts` for testability, not tidiness.** It was first written inline in
+the frame loop in `main.ts`, which imports three.js and is reachable by no unit test — so the feature had
+zero coverage and the persona gate failed it at QA. The rule a Viewer cannot see happening is exactly the
+one that has to be asserted, so it belongs somewhere a test can reach.
 
 The consequence is an interface obligation, not just a code one: a staged change that silently waits is
 indistinguishable from one that failed, so `panel.ts` marks a staged value whose Run has not caught up yet
@@ -483,6 +495,17 @@ Window travel values, and the time accumulator — is deliberate. Held separatel
 resetting each of them, and forgetting one fails severely and traces back poorly: stale travel state re-lays
 a ring that no longer exists, and a stale accumulator discharges the previous Run's banked time into the new
 one. Replacing an object cannot half-happen.
+
+**`applyStartRule` is called before `restartRun`, and the ordering is load-bearing (#46).** It writes
+`settings.explosion = false` when the Restart carries a Pattern. Both paths then pick it up without extra
+work: the changed-dimensions path constructs a new `Simulation` from the already-mutated settings, and the
+reseed-in-place path is caught by the settings diff further down the same frame, before any `advance()`. No
+Generation is ever computed under the rule the Viewer just left behind. Calling it *after* would break the
+first path silently, since the constructor reads settings once.
+
+This is also the only place this module *writes* to the settings object rather than reading and applying it.
+Deliberate: the panel holds a reference to the same object and reads it back to redraw, so a copy would
+update the Run and leave the interface asserting a rule that is not running.
 
 **Restart is a flag the loop lowers, not a callback the panel invokes.** Every change to Run state then
 happens at one known point in the frame, instead of a `Simulation` being swapped part-way through a frame
