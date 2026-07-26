@@ -492,12 +492,17 @@ export function createControlPanel(
 		placeholder.textContent = "Pattern…";
 		chooser.append(placeholder);
 
-		patterns.forEach((pattern, index) => {
+		// Keyed by the Pattern's own id rather than its position in the list. An
+		// index would resolve to a different Pattern the moment the list is
+		// reordered, and it would do so silently — and it would leave the product
+		// with two ways to name a Pattern, which is exactly what the id exists to
+		// avoid. #50 reads the same id out of the URL.
+		for (const pattern of patterns) {
 			const option = document.createElement("option");
-			option.value = String(index);
+			option.value = pattern.id;
 			option.textContent = pattern.name;
 			chooser.append(option);
-		});
+		}
 
 		chooser.addEventListener("change", () => {
 			const selected = chooser.value;
@@ -507,14 +512,14 @@ export function createControlPanel(
 
 			// The placeholder is a selection like any other, and reaching it fires a
 			// change: a keyboard Viewer arrowing down to a Pattern and back up lands
-			// here. Rejected explicitly rather than left to the lookup, because
-			// `Number("")` is 0 — so falling through would silently start a Run with
-			// the first Pattern in the list.
+			// here. Matching on id makes the empty value harmless on its own — it
+			// matches nothing — but it is rejected explicitly all the same, because
+			// the guard should not depend on no Pattern ever being given an empty id.
 			if (selected === "") {
 				return;
 			}
 
-			const chosen = patterns[Number(selected)];
+			const chosen = patterns.find((pattern) => pattern.id === selected);
 			if (chosen === undefined) {
 				return;
 			}
