@@ -24,8 +24,6 @@ export interface StructureView {
 	syncLatestLayer(): void;
 	/** Call once per frame, before rendering. */
 	syncFrameState(): void;
-	/** Resizes drawn Cells. Camera and Layer positions are untouched. */
-	setCellSize(cellSize: number): void;
 	/**
 	 * Sets the window the shader fades and cuts off against.
 	 *
@@ -51,8 +49,6 @@ export interface StructureView {
 }
 
 export interface StructureViewOptions {
-	/** Edge length of a drawn Cell, as a fraction of the lattice spacing. */
-	cellSize?: number;
 	/**
 	 * Ring slots to allocate — the largest Depth Window the interface permits.
 	 *
@@ -71,7 +67,6 @@ export function createStructureView(
 		height: simulation.height,
 		depthWindow: simulation.stack.maxDepth,
 		maximumAge: simulation.maximumAge,
-		...(options.cellSize === undefined ? {} : { cellSize: options.cellSize }),
 		...(options.ringCapacity === undefined
 			? {}
 			: { ringCapacity: options.ringCapacity }),
@@ -116,10 +111,6 @@ export function createStructureView(
 			// gradient then retargets the moment the Viewer moves the slider, with
 			// no separate notification to keep in step.
 			structure.setMaximumAge(simulation.maximumAge);
-		},
-
-		setCellSize(cellSize) {
-			structure.setCellSize(cellSize);
 		},
 
 		setDepthWindow(depthWindow) {

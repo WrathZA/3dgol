@@ -21,8 +21,6 @@ export interface Settings {
 	explosion: boolean;
 	/** Generations advanced per second. Zero is a pause. */
 	generationsPerSecond: number;
-	/** Edge length of a drawn Cell, as a fraction of the lattice spacing. */
-	cellSize: number;
 }
 
 /** The range a setting may be moved through, and the granularity it moves in. */
@@ -85,12 +83,6 @@ export const SETTING_BOUNDS = {
 	 * constant churn. Lowering the slider trades that back for immediacy.
 	 */
 	maximumAge: { min: 2, max: 200, step: 1 },
-	/**
-	 * Reaches 1 exactly, where Cells span the full lattice spacing and touch,
-	 * so layers can be driven all the way to solid sheets. The floor stays
-	 * clear of zero — a Cell has to remain visible to be seen through.
-	 */
-	cellSize: { min: 0.15, max: 1, step: 0.01 },
 	/**
 	 * Staged, not live — applied when a Run starts.
 	 *
@@ -161,7 +153,6 @@ export const DEFAULT_SETTINGS: Settings = {
 	maximumAge: 200,
 	explosion: true,
 	generationsPerSecond: 10,
-	cellSize: 0.55,
 };
 
 /**

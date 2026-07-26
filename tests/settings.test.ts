@@ -49,19 +49,12 @@ describe("clampSetting", () => {
 		expect(clampSetting(11.2, SETTING_BOUNDS.maximumAge)).toBe(11);
 	});
 
-	it("keeps a stepped fraction free of floating-point tails", () => {
-		// 0.15 + 40 × 0.01 is not 0.55 in binary floating point, and the drift
-		// shows up as a slider that will not sit still.
-		expect(clampSetting(0.55, SETTING_BOUNDS.cellSize)).toBe(0.55);
-		expect(clampSetting(0.333, SETTING_BOUNDS.cellSize)).toBe(0.33);
-	});
-
 	it("admits a Speed of zero, because pausing is the bottom of the range", () => {
 		expect(clampSetting(0, SETTING_BOUNDS.generationsPerSecond)).toBe(0);
 	});
 
 	it("rejects a value that is not a number", () => {
-		expect(() => clampSetting(Number.NaN, SETTING_BOUNDS.cellSize)).toThrow(
+		expect(() => clampSetting(Number.NaN, SETTING_BOUNDS.depthWindow)).toThrow(
 			/finite/,
 		);
 	});
@@ -86,7 +79,6 @@ describe("clampSettings", () => {
 			generationsPerSecond: 900,
 			depthWindow: 1,
 			maximumAge: 0,
-			cellSize: 4,
 		});
 
 		expect(clamped.generationsPerSecond).toBe(
@@ -94,7 +86,6 @@ describe("clampSettings", () => {
 		);
 		expect(clamped.depthWindow).toBe(SETTING_BOUNDS.depthWindow.min);
 		expect(clamped.maximumAge).toBe(SETTING_BOUNDS.maximumAge.min);
-		expect(clamped.cellSize).toBe(SETTING_BOUNDS.cellSize.max);
 	});
 
 	/**

@@ -87,7 +87,6 @@ interface Run {
 	appliedSpeed: number;
 	appliedMaximumAge: number;
 	appliedExplosion: boolean;
-	appliedCellSize: number;
 	/** The Depth Window being drawn, which travels toward the setting. */
 	drawnDepthWindow: number;
 	/** The Depth Window the ring is laid out for. An integer by construction. */
@@ -134,7 +133,6 @@ function startRun(previous: Run | undefined, pattern: Pattern | null): Run {
 	}
 
 	const view = createStructureView(simulation, {
-		cellSize: settings.cellSize,
 		// Allocated at the largest Depth Window the panel permits, so moving that
 		// slider re-lays the ring rather than reallocating it.
 		ringCapacity: SETTING_BOUNDS.depthWindow.max,
@@ -153,7 +151,6 @@ function startRun(previous: Run | undefined, pattern: Pattern | null): Run {
 		appliedSpeed: settings.generationsPerSecond,
 		appliedMaximumAge: settings.maximumAge,
 		appliedExplosion: settings.explosion,
-		appliedCellSize: settings.cellSize,
 		drawnDepthWindow: settings.depthWindow,
 		laidOutDepthWindow: settings.depthWindow,
 		accumulated: 0,
@@ -351,11 +348,6 @@ function frame(now: number): void {
 		// detonate on the next Generation rather than retroactively.
 		run.simulation.explosion = settings.explosion;
 		run.appliedExplosion = settings.explosion;
-	}
-
-	if (settings.cellSize !== run.appliedCellSize) {
-		run.view.setCellSize(settings.cellSize);
-		run.appliedCellSize = settings.cellSize;
 	}
 
 	applyDepthWindow(elapsed);

@@ -133,8 +133,6 @@ Applied immediately, without disturbing the run in progress:
 - **Explosion** — whether reaching A detonates at all. Off, nothing happens at A and the rule is plain
   Conway; the age still governs colour. Defaults on at page load, and is switched off by choosing a
   pattern (B8) — the only setting anything other than the Viewer moves.
-- **Cell size** — how large each cell is drawn, and therefore whether layers read as porous scatters or
-  solid sheets.
 
 Chosen per run, applied immediately by starting one:
 
@@ -187,7 +185,6 @@ Responsibilities:
 - Controls simulation speed, including pausing and resuming.
 - Sets the depth window (N layers) and the maximum cell age (A).
 - Switches the explosion on and off, which is also what decides whether anything happens at A at all.
-- Sets how large cells are drawn.
 - Sets the grid dimensions, which apply on the next restart.
 - Moves the camera — orbits, pans, and zooms around the structure while it builds, by pointer or by touch.
 - Starts a fresh run, either from a new random seed or from a pattern chosen from a fixed list.
@@ -362,18 +359,6 @@ is visibly off, and turning it back on re-seeds the settled region on the next g
 Grid dimensions have a floor high enough to hold every pattern shipped, so no pattern can ever be clipped
 and no selection has to be refused.
 
-### Display Configuration
-
-How the structure is drawn, independent of where it is viewed from.
-
-| Field | Meaning |
-|-------|---------|
-| `cellSize` | How large each cell is drawn. Small values leave gaps between cells, so layers read as scattered points and the structure is seen through; large values make neighbouring cells touch, so layers read as solid sheets and the structure becomes a massed volume. Viewer-adjustable. |
-
-Cell size is distinct from camera zoom. Zoom changes how close the Viewer is to the structure; cell size
-changes what the structure is made of. Both can change apparent scale, but only cell size changes whether
-the structure is porous or solid.
-
 ### Camera
 
 The Viewer's vantage point on the structure.
@@ -434,14 +419,6 @@ suppressed: it is the most direct way a Viewer can make something happen on dema
 With the explosion switched off, A moves the palette and nothing else: cells neither detonate nor die at
 it, so lowering A recolours the structure without disturbing it, and cells already past the new value are
 pulled back to its final colour rather than flaring.
-
-### B6 — Set cell size
-
-- #51 feat: cells are always drawn at full size
-
-The Viewer increases cell size → cells grow until neighbouring live cells touch and layers read as solid
-sheets. Decreases it → gaps open between cells, layers read as scattered points, and the interior of the
-structure becomes visible through the gaps. The camera does not move.
 
 ### B7 — Set grid dimensions
 

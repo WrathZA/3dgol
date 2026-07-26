@@ -91,8 +91,9 @@ is simply overwritten, and the shader stops drawing instances that have aged bey
 regardless of how many cells are alive. Each instance carries its grid position, its birth generation,
 and its age. A custom GLSL vertex shader derives, from a single `currentGeneration` uniform: vertical
 position (from the difference between the current generation and birth generation), opacity (a fade
-curve over the same difference, producing the dissolving bottom edge), colour (age against A along the
-gradient), and scale (from the cell-size setting). The consequence is that per-frame CPU work is
+curve over the same difference, producing the dissolving bottom edge), and colour (age against A along
+the gradient). Cells are drawn at the full lattice spacing, so there is no size factor to apply and no
+setting behind one. The consequence is that per-frame CPU work is
 constant — one uniform write — and does not grow with the number of instances. `OrbitControls` owns the
 camera and handles pointer and touch input natively.
 
@@ -237,7 +238,6 @@ of changing anything once it is loaded. Each control maps to a PRD behaviour:
 | Speed | B2, B3 | Generations advanced per second, including zero (paused) |
 | Depth (N) | B4 | Size of the visible history window; resizes the ring buffer |
 | Maximum age (A) | B5, B12 | Age at which a cell dies, and the span of the colour gradient |
-| Cell size | B6 | Per-instance scale in the vertex shader |
 | Grid width / height | B7 | Staged; applied only on the next restart |
 | Restart | B8 | Clears the stack, reseeds randomly, resets the generation counter |
 
