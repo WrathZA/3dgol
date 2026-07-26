@@ -13,6 +13,21 @@ import { createSignatureMark } from "@/ui/signature";
 const AUTHOR_PROFILE = "https://github.com/WrathZA";
 
 /**
+ * Panels built so far, so each one's id is its own.
+ *
+ * The one generated id in a module that otherwise avoids them by wrapping each
+ * input in its own `<label>`. `aria-controls` takes an id and nothing else, so
+ * there is no structural alternative — but a *fixed* id would quietly cost the
+ * property that made the labels worth writing that way: build the panel twice
+ * and two elements answer to the same name, which is exactly what a DOM test
+ * harness does, and it is invalid markup besides. Counted rather than random so
+ * a failure names the same element on every run.
+ */
+let panelsBuilt = 0;
+
+const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+
+/**
  * The control surface: the settings the Viewer can move, and the Restart button.
  *
  * This module mutates plain objects and does nothing else. It knows nothing about
@@ -28,6 +43,13 @@ const AUTHOR_PROFILE = "https://github.com/WrathZA";
 
 export interface ControlPanel {
 	element: HTMLElement;
+	/**
+	 * The control that opens and dismisses the panel on a small viewport.
+	 *
+	 * A sibling of `element`, not a descendant — see where it is built for why.
+	 * Exposed so a caller can reach it without a selector.
+	 */
+	toggle: HTMLButtonElement;
 	/**
 	 * Re-reads the settings and the running Grid, and updates every control.
 	 *
@@ -138,14 +160,101 @@ export function createControlPanel(
 		options.runningGrid ??
 		(() => ({ width: settings.gridWidth, height: settings.gridHeight }));
 
+	panelsBuilt += 1;
+	const panelId = `structure-controls-${panelsBuilt}`;
+
 	const element = document.createElement("section");
 	element.className = "panel";
+	element.id = panelId;
 	element.setAttribute("aria-label", "Structure controls");
+
+	/*
+	 * The toggle, and the collapsed state it drives.
+	 *
+	 * On a phone the panel is a sheet that starts closed: someone arriving should
+	 * see the Structure, not a stack of sliders with a sliver of it behind them.
+	 * On a desktop there is room for both, so the panel is simply always there and
+	 * the toggle is not.
+	 *
+	 * Which of those applies is decided entirely in CSS. This holds one flag and
+	 * writes one class; the stylesheet decides whether the absence of that class
+	 * means "hidden" or means nothing at all. The alternative — matchMedia here,
+	 * plus a listener to catch a rotation — would put the breakpoint in two places
+	 * that have to agree, and the interface would start holding opinions about
+	 * viewport size that belong in the stylesheet.
+	 *
+	 * A sibling of the panel rather than a child, and that is not arbitrary:
+	 * `backdrop-filter` makes `.panel` a containing block, so a `position: fixed`
+	 * child anchors to the panel instead of the viewport and travels with it out
+	 * of view.
+	 */
+	const toggle = document.createElement("button");
+	toggle.type = "button";
+	toggle.className = "panel__toggle";
+	toggle.setAttribute("aria-controls", panelId);
+	toggle.append(createToggleIcon());
+
+	const toggleText = document.createElement("span");
+	toggleText.className = "panel__toggle-text";
+	toggle.append(toggleText);
+
+	let open = false;
+
+	const setOpen = (next: boolean): void => {
+		open = next;
+		element.classList.toggle("panel--open", open);
+		toggle.classList.toggle("panel__toggle--open", open);
+		toggle.setAttribute("aria-expanded", String(open));
+		// The accessible name says what pressing it will do, not what state the
+		// panel is in — `aria-expanded` already carries the state, and saying it
+		// twice makes a screen reader read the panel as closed while announcing a
+		// button called "Close".
+		const action = open ? "Hide controls" : "Show controls";
+		toggle.setAttribute("aria-label", action);
+		toggleText.textContent = open ? "Hide" : "Controls";
+	};
+
+	toggle.addEventListener("click", () => {
+		setOpen(!open);
+	});
 
 	const title = document.createElement("h1");
 	title.className = "panel__title";
 	title.textContent = "Controls";
 	element.append(title);
+
+	/*
+	 * Dismissal from inside the sheet.
+	 *
+	 * The toggle closes it too, but the toggle sits behind an open sheet on a
+	 * phone, so closing would mean reaching past the thing being closed. Hidden on
+	 * a desktop, where there is nothing to dismiss.
+	 */
+	const close = document.createElement("button");
+	close.type = "button";
+	close.className = "panel__close";
+	close.setAttribute("aria-label", "Hide controls");
+	close.append(createCloseIcon());
+	close.addEventListener("click", () => {
+		setOpen(false);
+		// Focus goes back to the control that opened the sheet. Left on a button
+		// that has just been hidden, the focus ring lands nowhere and a keyboard
+		// Viewer has to tab from the top of the document to find their place.
+		toggle.focus();
+	});
+	element.append(close);
+
+	const dismissOnEscape = (event: KeyboardEvent): void => {
+		if (event.key === "Escape" && open) {
+			setOpen(false);
+			toggle.focus();
+		}
+	};
+
+	// On the document rather than the panel: Escape should dismiss regardless of
+	// whether focus is inside the sheet, and after a tap on a slider it usually is
+	// not.
+	document.addEventListener("keydown", dismissOnEscape);
 
 	const refreshers: Array<() => void> = [];
 
@@ -254,9 +363,32 @@ export function createControlPanel(
 
 	syncPending();
 
+	/*
+	 * How to move the camera — in the terms of the input the Viewer actually has.
+	 *
+	 * The gestures genuinely differ: a mouse zooms on the wheel and pans on the
+	 * right button, neither of which a phone has, and a phone pans and zooms with
+	 * the same two-finger movement. One line cannot describe both, and the desktop
+	 * wording on a phone is worse than no line at all — it names two controls that
+	 * do not exist and leaves the ones that do unmentioned.
+	 *
+	 * Both are written, and the stylesheet shows one. Choosing here would mean
+	 * reading pointer type in JavaScript and re-reading it when a tablet's keyboard
+	 * is attached or removed; the media query does that on its own.
+	 */
 	const note = document.createElement("p");
 	note.className = "panel__note";
-	note.textContent = "Drag to orbit · scroll to zoom · right-drag to pan";
+
+	const pointerHint = document.createElement("span");
+	pointerHint.className = "panel__note-hint panel__note-hint--fine";
+	pointerHint.textContent =
+		"Drag to orbit · scroll to zoom · right-drag to pan";
+
+	const touchHint = document.createElement("span");
+	touchHint.className = "panel__note-hint panel__note-hint--coarse";
+	touchHint.textContent = "Drag to orbit · pinch to zoom · two fingers to pan";
+
+	note.append(pointerHint, touchHint);
 	element.append(note);
 
 	// The author's mark, and the only way out of the product.
@@ -279,10 +411,15 @@ export function createControlPanel(
 	signature.append(createSignatureMark());
 	element.append(signature);
 
-	parent.append(element);
+	parent.append(element, toggle);
+
+	// Closed is the starting state, and the class the stylesheet keys off has to
+	// exist from the first paint rather than after the first tap.
+	setOpen(false);
 
 	return {
 		element,
+		toggle,
 		refresh: () => {
 			for (const refresh of refreshers) {
 				refresh();
@@ -290,7 +427,76 @@ export function createControlPanel(
 			syncPending();
 		},
 		dispose: () => {
+			document.removeEventListener("keydown", dismissOnEscape);
 			element.remove();
+			toggle.remove();
 		},
 	};
+}
+
+/**
+ * Three stacked sliders — the panel in miniature.
+ *
+ * Drawn rather than lettered because the toggle has to survive being narrow: on
+ * the smallest phones in landscape the word alone is most of the control's
+ * width, and a mark reads at a glance where a word has to be looked at.
+ *
+ * `createElementNS` rather than `innerHTML`, matching the author's mark: nothing
+ * here is Viewer-supplied, so this defends against nothing today — it keeps the
+ * places this codebase writes markup free of an HTML parser, so none of them can
+ * acquire one later by someone interpolating into a template literal.
+ */
+function createToggleIcon(): SVGSVGElement {
+	const svg = document.createElementNS(SVG_NAMESPACE, "svg");
+	svg.setAttribute("viewBox", "0 0 16 16");
+	svg.setAttribute("aria-hidden", "true");
+	svg.classList.add("panel__toggle-icon");
+
+	// Each row is a full-width rule with a thumb sitting at a different point
+	// along it, so the mark reads as sliders rather than as a list.
+	const rows: ReadonlyArray<{ y: number; thumb: number }> = [
+		{ y: 3.5, thumb: 11 },
+		{ y: 8, thumb: 5.5 },
+		{ y: 12.5, thumb: 9 },
+	];
+
+	for (const row of rows) {
+		const track = document.createElementNS(SVG_NAMESPACE, "line");
+		track.setAttribute("x1", "1.5");
+		track.setAttribute("x2", "14.5");
+		track.setAttribute("y1", String(row.y));
+		track.setAttribute("y2", String(row.y));
+		svg.append(track);
+
+		const thumb = document.createElementNS(SVG_NAMESPACE, "circle");
+		thumb.setAttribute("cx", String(row.thumb));
+		thumb.setAttribute("cy", String(row.y));
+		thumb.setAttribute("r", "2");
+		thumb.classList.add("panel__toggle-thumb");
+		svg.append(thumb);
+	}
+
+	return svg;
+}
+
+/** A cross, for dismissing the sheet. */
+function createCloseIcon(): SVGSVGElement {
+	const svg = document.createElementNS(SVG_NAMESPACE, "svg");
+	svg.setAttribute("viewBox", "0 0 16 16");
+	svg.setAttribute("aria-hidden", "true");
+	svg.classList.add("panel__close-icon");
+
+	for (const [x1, y1, x2, y2] of [
+		[4.5, 4.5, 11.5, 11.5],
+		[11.5, 4.5, 4.5, 11.5],
+	] as const) {
+		const stroke = document.createElementNS(SVG_NAMESPACE, "line");
+		stroke.setAttribute("x1", String(x1));
+		stroke.setAttribute("y1", String(y1));
+		stroke.setAttribute("x2", String(x2));
+		stroke.setAttribute("y2", String(y2));
+		svg.append(stroke);
+	}
+
+	return svg;
 }

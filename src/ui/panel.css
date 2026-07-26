@@ -7,8 +7,16 @@
  * lifted from the birth end of the Colour Gradient, so the interface and the
  * thing it controls belong to the same picture.
  *
- * Phone layout and the collapsed state are a separate issue. This is the desktop
- * arrangement, kept narrow and out of the way.
+ * Two arrangements, and this file decides which applies.
+ *
+ * The desktop one is below and is the default: a narrow column pinned top-right,
+ * always present, because there is room for it beside the Structure. The small
+ * one is at the foot of this file: a sheet along the bottom that starts closed,
+ * because on a phone there is not.
+ *
+ * `panel.ts` holds one flag and writes one class. Whether the *absence* of that
+ * class means "hidden" or means nothing at all is decided here, and only here —
+ * so the breakpoint exists in one place and a rotation needs no listener.
  */
 
 .panel {
@@ -21,13 +29,26 @@
 	padding: 1rem 1.1rem 1.15rem;
 
 	/*
+	 * Without this, `max-height` below bounds the *content* box and the padding and
+	 * border sit outside it, so the panel overruns its own cap by about 36px and
+	 * the last control goes under the edge of the window — the exact failure the
+	 * cap exists to prevent, silently reintroduced by the default box model.
+	 */
+	box-sizing: border-box;
+
+	/*
 	 * The panel is fixed, so anything past the bottom of the viewport is simply
 	 * unreachable — there is no page to scroll. With six controls and a button it
 	 * is tall enough that a short window puts Restart off the end, so it is bounded
 	 * to the viewport and scrolls within itself instead. Contained overscroll keeps
 	 * that scroll from bubbling out and dragging the page around behind it.
+	 *
+	 * `dvh`, not `vh`: on a device with a collapsing browser toolbar, `vh` measures
+	 * the viewport as if the toolbar were already gone, so a bound expressed in it
+	 * still puts Restart under the toolbar — which is the failure this line exists
+	 * to prevent. No `vh` fallback: `dvh` is available everywhere the product runs.
 	 */
-	max-height: calc(100vh - 2.5rem);
+	max-height: calc(100dvh - 2.5rem);
 	overflow-y: auto;
 	overscroll-behavior: contain;
 
@@ -42,10 +63,31 @@
 		ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 	color: #cdd6e4;
 
-	/* The panel is a surface for the pointer, not for the camera: gestures that
-	 * land here must not also orbit the structure behind it. */
-	touch-action: auto;
+	/*
+	 * The panel is a surface for the pointer, not for the camera: gestures that
+	 * land here must not also orbit the structure behind it.
+	 *
+	 * `pan-y` rather than `auto`, which is the whole difference on a phone. The
+	 * panel scrolls inside itself, so vertical dragging has to stay with the
+	 * browser — but `auto` also concedes pinch, and a pinch that begins on the
+	 * panel then zooms the *page*: the Structure jumps, the panel grows, and
+	 * nothing about it looks like the zoom the Viewer was asking the camera for.
+	 * `pan-y` keeps the scroll and refuses the zoom.
+	 */
+	touch-action: pan-y;
 	user-select: none;
+}
+
+/*
+ * The toggle, and the close control inside the sheet.
+ *
+ * Both are desktop-invisible: the panel is simply present there, so there is
+ * nothing to reveal and nothing to dismiss. `display: none` rather than opacity
+ * so neither is reachable by keyboard on a viewport where it would do nothing.
+ */
+.panel__toggle,
+.panel__close {
+	display: none;
 }
 
 .panel__title {
@@ -243,6 +285,26 @@
 }
 
 /*
+ * One hint per input. Both are in the markup; exactly one is displayed.
+ *
+ * `display: none` rather than a visual hide, so a screen reader is not given two
+ * contradictory sets of instructions to read out in sequence.
+ */
+.panel__note-hint--coarse {
+	display: none;
+}
+
+@media (pointer: coarse) {
+	.panel__note-hint--fine {
+		display: none;
+	}
+
+	.panel__note-hint--coarse {
+		display: inline;
+	}
+}
+
+/*
  * The author's mark.
  *
  * A block rather than an inline link so the hit area is the full width of the
@@ -298,4 +360,267 @@
 .panel__signature-apple {
 	fill: #7ef9e8;
 	stroke: none;
+}
+
+/*
+ * Appearance of the toggle and the close control. Their `display` is decided in
+ * the small-viewport block below; everything else is defined once, here.
+ */
+.panel__toggle {
+	position: fixed;
+	right: 0.75rem;
+	bottom: 0.75rem;
+	z-index: 2;
+
+	align-items: center;
+	gap: 0.45rem;
+	min-height: 2.25rem;
+	padding: 0 0.9rem;
+
+	font-family:
+		ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	font-size: 0.72rem;
+	font-weight: 600;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: #cdd6e4;
+
+	/* The same glass as the panel, so the control that opens it looks like part
+	 * of it rather than a separate piece of furniture. */
+	background: rgb(13 17 26 / 72%);
+	backdrop-filter: blur(14px);
+	border: 1px solid rgb(126 249 232 / 22%);
+	border-radius: 999px;
+	cursor: pointer;
+	user-select: none;
+	transition:
+		background-color 120ms ease-out,
+		border-color 120ms ease-out;
+}
+
+.panel__toggle:active {
+	background: rgb(126 249 232 / 14%);
+}
+
+.panel__toggle:focus-visible {
+	outline: none;
+	border-color: #7ef9e8;
+	box-shadow: 0 0 0 0.2rem rgb(126 249 232 / 22%);
+}
+
+.panel__toggle-icon {
+	display: block;
+	width: 1rem;
+	height: 1rem;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.25;
+	stroke-linecap: round;
+}
+
+/* The thumbs are the accent, matching the sliders the mark stands for. */
+.panel__toggle-thumb {
+	fill: #7ef9e8;
+	stroke: none;
+}
+
+.panel__close {
+	/* Sticky rather than absolute: the sheet scrolls inside itself, and a dismiss
+	 * control that scrolls away is one the Viewer has to scroll back up to find. */
+	position: sticky;
+	top: 0;
+	z-index: 1;
+
+	align-items: center;
+	justify-content: center;
+	width: 1.9rem;
+	height: 1.9rem;
+	padding: 0;
+
+	color: rgb(205 214 228 / 62%);
+	background: transparent;
+	border: 0;
+	border-radius: 0.35rem;
+	cursor: pointer;
+}
+
+.panel__close:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 0.2rem rgb(126 249 232 / 22%);
+}
+
+.panel__close-icon {
+	display: block;
+	width: 1rem;
+	height: 1rem;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.5;
+	stroke-linecap: round;
+}
+
+/*
+ * The small viewport.
+ *
+ * Width *or* height, because a phone in landscape is neither narrow nor tall: at
+ * 740 × 360 the desktop column is not too wide, it is taller than the window,
+ * and Restart falls off the end. Keying only on width would leave the worse of
+ * the two orientations unhandled.
+ *
+ * The arrangement is a sheet along the bottom, closed until asked for. Bottom
+ * rather than top because that is where a thumb already is, and because the
+ * Structure's silhouette is the thing worth leaving uncovered — it is framed to
+ * sit in the middle of the frame, not at the foot of it.
+ */
+@media (max-width: 40rem), (max-height: 30rem) {
+	.panel {
+		/*
+		 * Spanning the gutters and anchored above the toggle, so the two never
+		 * overlap and the toggle stays hittable while the sheet is open — which is
+		 * what lets it also be the dismiss control, with no focus to move and
+		 * nothing to hide.
+		 */
+		top: auto;
+		right: 0.75rem;
+		bottom: 4rem;
+		left: 0.75rem;
+		width: auto;
+
+		/*
+		 * Wide enough to fill a phone in portrait and no wider. In landscape the
+		 * gutters are 820px apart, and a sheet that took all of it would turn every
+		 * slider into an 800px sweep of the thumb and leave two controls on screen
+		 * with the rest below the fold — while covering the Structure completely.
+		 * Capped and pushed to the right edge, it stays a sheet instead of becoming
+		 * a wall, and most of the Structure is still there to watch while a slider
+		 * is being moved.
+		 */
+		max-width: 24rem;
+		margin-left: auto;
+
+		display: flex;
+		flex-direction: column;
+
+		/*
+		 * dvh, not vh: `vh` is the *large* viewport on a phone, so a sheet sized in
+		 * it extends under the browser toolbar and the last control is unreachable
+		 * — the exact failure the desktop `max-height` exists to prevent.
+		 */
+		max-height: calc(100dvh - 5rem);
+
+		/*
+		 * Out of the way until asked for, and out of the tab order with it —
+		 * `visibility`, not `opacity` alone, or every control stays tabbable behind
+		 * a sheet that is not there.
+		 *
+		 * Nothing here is transitioned, and that is deliberate rather than
+		 * unfinished. A transition is created when the class changes but only runs
+		 * once the compositor assigns it a start time, and this page can leave it
+		 * pending indefinitely — a WebGL canvas redrawing every frame under a
+		 * `backdrop-filter` surface is exactly that load. Measured after a tap:
+		 * `getAnimations()` reported every transitioned property `running` with
+		 * `startTime: null` and `currentTime: 0`, so the sheet held its *closed*
+		 * values forever and the tap looked ignored.
+		 *
+		 * A stuck transition always strands the from-value, so there is no property
+		 * that is safe to ease here: opacity stuck at 0 is an invisible panel, and
+		 * a stuck translate is a panel 12px out of place, overlapping the control
+		 * that dismisses it. The version of this rule that slid the sheet up was
+		 * written, measured, and removed for exactly that.
+		 *
+		 * The instinct on reading this will be to put the motion back. Confirm the
+		 * transition actually starts on a device under load first — a slide that
+		 * works on a desktop is not evidence.
+		 */
+		visibility: hidden;
+		opacity: 0;
+	}
+
+	.panel--open {
+		visibility: visible;
+		opacity: 1;
+	}
+
+	/*
+	 * The sheet scrolls, so its contents must keep their own height. Flex items
+	 * shrink by default, and content taller than the sheet makes every one of them
+	 * a candidate: the dismiss control collapsed from 44px to the 16px of its icon,
+	 * which is a target too small to hit and no longer square.
+	 */
+	.panel > * {
+		flex-shrink: 0;
+	}
+
+	.panel__toggle {
+		display: inline-flex;
+	}
+
+	.panel__close {
+		display: flex;
+		/* First in the flex order despite following the title in the DOM, where it
+		 * belongs to the panel rather than to the heading. */
+		order: -1;
+		align-self: flex-end;
+		margin-bottom: -0.5rem;
+	}
+}
+
+/*
+ * Fingers.
+ *
+ * Keyed on pointer type rather than on viewport size, because the two are not
+ * the same question and get different answers: a tablet is wide enough for the
+ * desktop arrangement and is still operated by thumb, while a narrow desktop
+ * window is small and still has a mouse. Sizing targets by width would leave the
+ * first of those with 20px sliders.
+ *
+ * The numbers are all 2.75rem — 44px, the smallest target a finger hits reliably
+ * — and they are applied to the *hit* area only. The slider's visible track stays
+ * 2px and the thumb stays where it is: growing what is drawn would coarsen the
+ * panel on every touch device to solve a problem that is about where a tap lands,
+ * not about what it looks like.
+ */
+@media (pointer: coarse) {
+	.panel__slider {
+		height: 2.75rem;
+	}
+
+	/* The thumb is centred on the track by a negative margin, so its offset has to
+	 * follow the taller input or the thumb floats away from the line it rides. */
+	.panel__slider::-webkit-slider-thumb {
+		width: 1.1rem;
+		height: 1.1rem;
+		margin-top: -0.5rem;
+	}
+
+	.panel__slider::-moz-range-thumb {
+		width: 1.1rem;
+		height: 1.1rem;
+	}
+
+	.panel__restart {
+		min-height: 2.75rem;
+	}
+
+	.panel__toggle {
+		min-height: 2.75rem;
+	}
+
+	.panel__close {
+		width: 2.75rem;
+		height: 2.75rem;
+		/* Pulled into the panel's own padding so a target this size does not push
+		 * the first control down a row it does not need. */
+		margin: -0.35rem -0.35rem -0.9rem 0;
+	}
+
+	/*
+	 * Separation, not just size. Two 44px targets touching are one 88px target
+	 * that does the wrong thing half the time, and the sliders here sit in a
+	 * single column with nothing but a hairline between them.
+	 */
+	.panel__control + .panel__control {
+		margin-top: 1.15rem;
+		padding-top: 1.15rem;
+	}
 }

@@ -25,11 +25,18 @@
        * it the browser claims drags for scrolling and pinches for page zoom, and
        * touch navigation simply does not work — no matter what the controls
        * support. Safe here because the page has nothing to scroll.
+       *
+       * Height in dvh, not %. On a phone, 100% of the body is the *large*
+       * viewport — the one measured with the browser toolbar collapsed — so a
+       * percentage canvas runs underneath the toolbar and the bottom of the
+       * structure is cut off until the Viewer happens to scroll it away. dvh
+       * tracks what is actually visible, which is also what makes landscape
+       * usable: the same rule fits both orientations without a second layout.
        */
       #viewport {
         display: block;
         width: 100%;
-        height: 100%;
+        height: 100dvh;
         touch-action: none;
       }
 
