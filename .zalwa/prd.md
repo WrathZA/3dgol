@@ -317,9 +317,18 @@ A named arrangement of live cells the product ships, offered as a starting point
 | `cells` | The live positions the pattern draws, at age 1 |
 
 Patterns are fixed content, not Viewer data: the list is the same for everyone and cannot be added to from
-inside the product. A pattern is placed toward one corner rather than centred, because what a pattern
-*emits* needs somewhere to travel before the bounded edge destroys it — and for a glider gun that travel is
-the entire point.
+inside the product.
+
+**Every pattern is placed toward one corner, and that suits some of them better than others.** A pattern
+that *emits* needs somewhere for its output to travel before the bounded edge destroys it, and for a glider
+gun that travel is the entire point — corner placement gives it the whole diagonal. A pattern that merely
+oscillates does not care where it sits. A pattern that *sprawls* — one of the long-running chaotic ones — is
+actively served worse by a corner than by the centre, because it reaches two boundaries almost at once
+instead of having room in every direction.
+
+One placement for all patterns is a simplification rather than the right answer for each. It is recorded
+here as such so that a later session reads it as a known compromise rather than as a decision that
+considered the sprawling case and chose the corner.
 
 **A pattern carries the rule it needs, not just the cells it starts with.** Choosing one switches the
 explosion off (see B8). That is why a pattern is not a setting: a setting is a value the product holds,
