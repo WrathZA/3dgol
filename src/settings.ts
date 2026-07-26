@@ -90,13 +90,25 @@ export const SETTING_BOUNDS = {
 	/**
 	 * Staged, not live — applied when a Run starts.
 	 *
-	 * The floor keeps the Grid large enough for Life to have somewhere to happen;
-	 * below about sixteen a Bounded Edge destroys almost everything before it
-	 * moves. The ceiling is where the instance product stops being defensible: the
-	 * cost is area, so 96 is not twice 48 but four times it.
+	 * **The floor is set by the largest Pattern the product ships, not by what
+	 * Life needs.** It was 16, on the reasoning that a smaller Bounded Edge Grid
+	 * destroys almost everything before it moves. Offering Patterns replaced that
+	 * with a harder constraint: a Grid that cannot hold Gosper's gun (36 × 9) would
+	 * mean either a clipped Pattern or a control that refuses, and 50 removes the
+	 * case entirely — every selectable Grid holds every Pattern, so there is no
+	 * disabled state to design and no partial Pattern to guard against. A Pattern
+	 * larger than this floor is caught by the bounds test rather than by a Viewer
+	 * selecting it; see `largestPatternExtent()` in `sim/patterns.ts`.
+	 *
+	 * The floor therefore equals the default, so the Grid sliders start at their
+	 * minimum and only move upward. That is a real loss — small Grids were
+	 * reachable before — and it is the price of the Pattern list.
+	 *
+	 * The ceiling is where the instance product stops being defensible: the cost
+	 * is area, so 96 is not twice 50 but nearly four times it.
 	 */
-	gridWidth: { min: 16, max: 96, step: 1 },
-	gridHeight: { min: 16, max: 96, step: 1 },
+	gridWidth: { min: 50, max: 96, step: 1 },
+	gridHeight: { min: 50, max: 96, step: 1 },
 } as const satisfies Record<string, SettingBound>;
 
 /** Any setting with a declared range. */
@@ -107,8 +119,14 @@ export type BoundedSetting = keyof typeof SETTING_BOUNDS;
  *
  * The Grid is small enough that individual Cells are legible at the default
  * camera distance, and the Depth Window deep enough that a glider's diagonal
- * reads as a streak. Together they set the instance count — 48 × 48 × 60 is
- * about 138,000 — which is comfortable everywhere.
+ * reads as a streak. Together they set the instance count — 50 × 50 × 60 is
+ * 150,000 — which is comfortable everywhere.
+ *
+ * The Grid is 50 rather than 48 because that is the floor Patterns impose, and
+ * it happens to suit the Depth Window: Gosper's gun leaves its gliders about
+ * fourteen columns of diagonal travel before the Bounded Edge, which is roughly
+ * 56 Generations, so a glider's whole life very nearly fills the 60 Layers on
+ * screen and its streak spans the structure rather than stopping part-way up.
  *
  * These are not the ceiling. What a device can actually afford is measured
  * rather than assumed, and that work has its own issue.
@@ -133,8 +151,8 @@ export type BoundedSetting = keyof typeof SETTING_BOUNDS;
  * at the default Depth Window.
  */
 export const DEFAULT_SETTINGS: Settings = {
-	gridWidth: 48,
-	gridHeight: 48,
+	gridWidth: 50,
+	gridHeight: 50,
 	depthWindow: 60,
 	maximumAge: 200,
 	explosion: true,
