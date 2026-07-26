@@ -398,8 +398,8 @@
 }
 
 /*
- * Appearance of the toggle and the close control. Their `display` is decided in
- * the small-viewport block below; everything else is defined once, here.
+ * Appearance of the toggle. Its `display` is decided in the small-viewport block
+ * below; everything else is defined once, here.
  */
 .panel__toggle {
 	/* Absolute within `.panel-layer`, so `bottom` is the bottom of the *visible*

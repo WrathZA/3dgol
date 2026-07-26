@@ -171,7 +171,11 @@ function readLayout() {
 						 * Asserting the layer is therefore the check that fails the moment
 						 * someone reverts to `position: fixed`.
 						 */
-						positionedAgainst: toggle.offsetParent?.className ?? null,
+						positionedAgainst: toggle.offsetParent === null
+							? null
+							: toggle.offsetParent.classList.contains("panel-layer")
+								? "panel-layer"
+								: toggle.offsetParent.className,
 					},
 		targets,
 		hint,
