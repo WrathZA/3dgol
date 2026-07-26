@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+	applyStartRule,
 	clampSetting,
 	clampSettings,
 	DEFAULT_SETTINGS,
 	SETTING_BOUNDS,
 	type Settings,
 } from "@/settings";
+import { GOSPER_GLIDER_GUN } from "@/sim/patterns";
 
 describe("DEFAULT_SETTINGS", () => {
 	/**
@@ -110,5 +112,41 @@ describe("clampSettings", () => {
 
 		expect(clamped.gridWidth).toBe(SETTING_BOUNDS.gridWidth.min);
 		expect(clamped.gridHeight).toBe(SETTING_BOUNDS.gridHeight.max);
+	});
+});
+
+describe("applyStartRule", () => {
+	it("switches the Explosion off for a Pattern", () => {
+		// The rule this exists for. A Pattern that rests on Cells which never change
+		// state is destroyed by the Explosion reaching them, so choosing one asks for
+		// the rule it needs as well as the Cells it starts with.
+		const settings: Settings = { ...DEFAULT_SETTINGS, explosion: true };
+
+		applyStartRule(settings, GOSPER_GLIDER_GUN);
+
+		expect(settings.explosion).toBe(false);
+	});
+
+	it("leaves the Explosion alone for a random Seed", () => {
+		// The asymmetry, asserted in both directions rather than assumed. Random does
+		// not restore the Explosion, so a Viewer who tries a Pattern and then presses
+		// Random inherits it off — an accepted cost, and this is where it is pinned.
+		const on: Settings = { ...DEFAULT_SETTINGS, explosion: true };
+		applyStartRule(on, null);
+		expect(on.explosion).toBe(true);
+
+		const off: Settings = { ...DEFAULT_SETTINGS, explosion: false };
+		applyStartRule(off, null);
+		expect(off.explosion).toBe(false);
+	});
+
+	it("changes nothing else about the settings", () => {
+		// A Pattern reaches exactly one control. If it ever reaches a second, that is
+		// a product decision and it should fail here first.
+		const settings: Settings = { ...DEFAULT_SETTINGS, explosion: true };
+
+		applyStartRule(settings, GOSPER_GLIDER_GUN);
+
+		expect(settings).toEqual({ ...DEFAULT_SETTINGS, explosion: false });
 	});
 });

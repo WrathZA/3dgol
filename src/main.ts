@@ -1,6 +1,11 @@
 import { createScene } from "@/render/scene";
 import { createStructureView, type StructureView } from "@/render/structure";
-import { clampSettings, DEFAULT_SETTINGS, SETTING_BOUNDS } from "@/settings";
+import {
+	applyStartRule,
+	clampSettings,
+	DEFAULT_SETTINGS,
+	SETTING_BOUNDS,
+} from "@/settings";
 import { advanceClock, retimeAccumulator } from "@/sim/clock";
 import { PATTERNS, type Pattern } from "@/sim/patterns";
 import { Simulation } from "@/sim/simulation";
@@ -272,31 +277,15 @@ function frame(now: number): void {
 		const pattern = restart.pattern;
 		restart.pattern = null;
 
-		/*
-		 * A Pattern switches the Explosion off; Random does not switch it on.
-		 *
-		 * Gosper's gun rests on four Cells that never change state, so with the
-		 * Explosion on they reach Maximum Age and detonate — the gun runs perfectly
-		 * for about two hundred Generations and then dismantles itself, which reads
-		 * as the product breaking rather than as a rule worth watching. A Pattern is
-		 * a description of one Run rather than a setting, and the rule that Run needs
-		 * is part of what was chosen.
-		 *
-		 * **The asymmetry is deliberate and this is the whole of it.** Random is not
-		 * mentioned below because it does not touch the control at all: a Viewer who
-		 * tries a Pattern and then presses Random inherits the Explosion off, and so
-		 * inherits plain Conway decaying into still lifes. That cost was accepted
-		 * rather than overlooked — switching it back on would reset the control every
-		 * time a Pattern was re-selected, which takes away watching the gun detonate
-		 * on schedule. The switch stays live either way.
-		 *
-		 * Set before `restartRun`, not after: the changed-dimensions path builds a new
-		 * Simulation from `settings`, and the reseed-in-place path is picked up by the
-		 * settings diff further down this same frame.
-		 */
-		if (pattern !== null) {
-			settings.explosion = false;
-		}
+		// A Pattern switches the Explosion off; Random changes nothing. The rule and
+		// the reasoning live in `settings.ts` so they can be tested — this module is
+		// unreachable by any unit test.
+		//
+		// Called before `restartRun`, not after: the changed-dimensions path builds a
+		// new Simulation from `settings`, and the reseed-in-place path is picked up by
+		// the settings diff further down this same frame. Either way no Generation is
+		// computed under the rule the Viewer just left behind.
+		applyStartRule(settings, pattern);
 
 		restartRun(pattern);
 	}
