@@ -2,7 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      viewport-fit=cover lets the page extend under a phone's rounded corners and
+      home indicator, which is what the Structure wants — and, less obviously, it
+      is what makes `env(safe-area-inset-*)` resolve to anything other than zero.
+      The control layer reads those insets to keep itself clear of the indicator,
+      so without this the panel's safe-area handling silently does nothing.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <title>3D Game of Life</title>
     <meta
       name="description"

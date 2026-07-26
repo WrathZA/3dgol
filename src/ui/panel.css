@@ -19,11 +19,49 @@
  * so the breakpoint exists in one place and a rotation needs no listener.
  */
 
-.panel {
+/*
+ * The layer both controls live in.
+ *
+ * Everything below positions against this rather than against the viewport, and
+ * that is the whole point. `position: fixed` resolves against the *layout*
+ * viewport, which on iOS Safari is the large one — the page as it would be with
+ * the browser toolbar collapsed — so a control pinned to `bottom` sits behind the
+ * toolbar. This shipped: the toggle was unreachable on a real iPhone while
+ * headless Chromium, which has no toolbar, measured it comfortably on screen.
+ *
+ * The layer is `100dvh`, which tracks what is actually visible, so "the bottom"
+ * inside it means the bottom of what the Viewer can see. Padding carries the
+ * safe-area insets — absolutely positioned children resolve against the padding
+ * box, so one declaration keeps both controls clear of the home indicator.
+ *
+ * `pointer-events: none` is load-bearing, not tidiness. The layer covers the
+ * whole viewport; without it every orbit, pan, and pinch would land here instead
+ * of on the camera, and navigation would simply stop working.
+ */
+.panel-layer {
 	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 1;
+
+	width: 100%;
+	height: 100dvh;
+
+	box-sizing: border-box;
+	padding: env(safe-area-inset-top) env(safe-area-inset-right)
+		env(safe-area-inset-bottom) env(safe-area-inset-left);
+
+	pointer-events: none;
+}
+
+.panel {
+	position: absolute;
 	top: 1.25rem;
 	right: 1.25rem;
-	z-index: 1;
+
+	/* The layer does not take pointer events; its children have to take their
+	 * own back. */
+	pointer-events: auto;
 
 	width: 15rem;
 	padding: 1rem 1.1rem 1.15rem;
@@ -79,14 +117,11 @@
 }
 
 /*
- * The toggle, and the close control inside the sheet.
- *
- * Both are desktop-invisible: the panel is simply present there, so there is
- * nothing to reveal and nothing to dismiss. `display: none` rather than opacity
- * so neither is reachable by keyboard on a viewport where it would do nothing.
+ * The toggle is desktop-invisible: the panel is simply present there, so there
+ * is nothing to reveal. `display: none` rather than opacity so it is not
+ * reachable by keyboard on a viewport where pressing it would do nothing.
  */
-.panel__toggle,
-.panel__close {
+.panel__toggle {
 	display: none;
 }
 
@@ -363,14 +398,17 @@
 }
 
 /*
- * Appearance of the toggle and the close control. Their `display` is decided in
- * the small-viewport block below; everything else is defined once, here.
+ * Appearance of the toggle. Its `display` is decided in the small-viewport block
+ * below; everything else is defined once, here.
  */
 .panel__toggle {
-	position: fixed;
+	/* Absolute within `.panel-layer`, so `bottom` is the bottom of the *visible*
+	 * viewport rather than of one a browser toolbar is covering. */
+	position: absolute;
 	right: 0.75rem;
 	bottom: 0.75rem;
 	z-index: 2;
+	pointer-events: auto;
 
 	align-items: center;
 	gap: 0.45rem;
@@ -422,41 +460,6 @@
 .panel__toggle-thumb {
 	fill: #7ef9e8;
 	stroke: none;
-}
-
-.panel__close {
-	/* Sticky rather than absolute: the sheet scrolls inside itself, and a dismiss
-	 * control that scrolls away is one the Viewer has to scroll back up to find. */
-	position: sticky;
-	top: 0;
-	z-index: 1;
-
-	align-items: center;
-	justify-content: center;
-	width: 1.9rem;
-	height: 1.9rem;
-	padding: 0;
-
-	color: rgb(205 214 228 / 62%);
-	background: transparent;
-	border: 0;
-	border-radius: 0.35rem;
-	cursor: pointer;
-}
-
-.panel__close:focus-visible {
-	outline: none;
-	box-shadow: 0 0 0 0.2rem rgb(126 249 232 / 22%);
-}
-
-.panel__close-icon {
-	display: block;
-	width: 1rem;
-	height: 1rem;
-	fill: none;
-	stroke: currentColor;
-	stroke-width: 1.5;
-	stroke-linecap: round;
 }
 
 /*
@@ -555,15 +558,80 @@
 		display: inline-flex;
 	}
 
-	.panel__close {
-		display: flex;
-		/* First in the flex order despite following the title in the DOM, where it
-		 * belongs to the panel rather than to the heading. */
-		order: -1;
-		align-self: flex-end;
-		margin-bottom: -0.5rem;
+	/*
+	 * Tightening, and the budget it comes from.
+	 *
+	 * The sheet has to hold six sliders, Restart, the hint, and the signature in
+	 * roughly 580px. The first version needed 852px and scrolled — measured at
+	 * 390 × 664 with the sheet open — with the six controls alone accounting for
+	 * 508px of it. So the cuts have to come from the controls, and everything
+	 * around them gives up what it can.
+	 *
+	 * The panel's own padding shrinks too, because it is paid twice: once at the
+	 * top and once at the bottom of a box that is already the tightest thing on
+	 * the screen.
+	 */
+	.panel {
+		padding: 0.75rem 0.9rem 0.85rem;
+	}
+
+	/*
+	 * The heading goes. The toggle that opened the sheet says "Controls" and is
+	 * still on screen beneath it, so the sheet repeating the word costs 28px to
+	 * tell the Viewer something they just read. `display: none` rather than a
+	 * visual hide would take it from the accessibility tree, so it is positioned
+	 * out of view instead and still names the region for a screen reader.
+	 */
+	.panel__title {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		margin: 0;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	.panel__label {
+		margin-bottom: 0.2rem;
+	}
+
+	.panel__restart {
+		margin-top: 0.6rem;
+	}
+
+	.panel__note {
+		margin-top: 0.6rem;
+	}
+
+	/*
+	 * The mark shrinks with everything else. It is a signature rather than a
+	 * control, so it is the one element here that can afford to be small — and at
+	 * 3rem it was the third-largest thing in the sheet.
+	 */
+	.panel__signature {
+		margin-top: 0.6rem;
+		padding-top: 0.6rem;
+	}
+
+	.panel__signature-mark {
+		height: 1.6rem;
 	}
 }
+
+/*
+ * Headroom, and why there has to be some.
+ *
+ * Everything above was tuned against a measurement taken in headless Chromium on
+ * Linux, where the panel's font stack falls through to whatever that machine has.
+ * An iPhone resolves the same stack to `-apple-system`, whose metrics are not the
+ * same — so a layout measured to fit with two pixels to spare is a layout that
+ * fits on the machine it was measured on. The trims above leave the sheet roughly
+ * 60px under its own cap so the difference has somewhere to go.
+ *
+ * If a control is ever added, re-measure rather than assuming the slack absorbs
+ * it: `pnpm smoke --phone` fails when the content stops fitting.
+ */
 
 /*
  * Fingers.
@@ -574,28 +642,36 @@
  * window is small and still has a mouse. Sizing targets by width would leave the
  * first of those with 20px sliders.
  *
- * The numbers are all 2.75rem — 44px, the smallest target a finger hits reliably
- * — and they are applied to the *hit* area only. The slider's visible track stays
- * 2px and the thumb stays where it is: growing what is drawn would coarsen the
- * panel on every touch device to solve a problem that is about where a tap lands,
- * not about what it looks like.
+ * They apply to the *hit* area only. The slider's visible track stays 2px and the
+ * thumb stays where it is: growing what is drawn would coarsen the panel on every
+ * touch device to solve a problem that is about where a tap lands, not about what
+ * it looks like.
+ *
+ * **Two numbers, not one, and the difference is the lesson from #37.** Restart and
+ * the toggle get 44px — the usual minimum for a target a finger has to land on
+ * once. The sliders get 32px, because six of them stacked on a phone are not six
+ * independent targets: at 44px apiece plus the separation they needed, the sheet
+ * ran 270px past the screen and every control was harder to reach for it. A
+ * slider is also dragged rather than tapped, and it spans the full width of the
+ * panel, so the height is the least of what makes it hittable. Sizing each
+ * control correctly in isolation produced an interface that failed as a whole.
  */
 @media (pointer: coarse) {
 	.panel__slider {
-		height: 2.75rem;
+		height: 2rem;
 	}
 
 	/* The thumb is centred on the track by a negative margin, so its offset has to
 	 * follow the taller input or the thumb floats away from the line it rides. */
 	.panel__slider::-webkit-slider-thumb {
-		width: 1.1rem;
-		height: 1.1rem;
-		margin-top: -0.5rem;
+		width: 1.05rem;
+		height: 1.05rem;
+		margin-top: -0.47rem;
 	}
 
 	.panel__slider::-moz-range-thumb {
-		width: 1.1rem;
-		height: 1.1rem;
+		width: 1.05rem;
+		height: 1.05rem;
 	}
 
 	.panel__restart {
@@ -606,21 +682,24 @@
 		min-height: 2.75rem;
 	}
 
-	.panel__close {
-		width: 2.75rem;
-		height: 2.75rem;
-		/* Pulled into the panel's own padding so a target this size does not push
-		 * the first control down a row it does not need. */
-		margin: -0.35rem -0.35rem -0.9rem 0;
+	/*
+	 * The mark is drawn small and hit large — the same split as the sliders.
+	 * Shrinking the drawing to buy vertical space took the link's hit area down
+	 * with it, and this is a link a thumb has to land on, not a decoration.
+	 */
+	.panel__signature {
+		align-items: center;
+		min-height: 2.75rem;
 	}
 
 	/*
-	 * Separation, not just size. Two 44px targets touching are one 88px target
-	 * that does the wrong thing half the time, and the sliders here sit in a
-	 * single column with nothing but a hairline between them.
+	 * Separation, not just size — but less of it than the first attempt used.
+	 * Adjacent sliders are already parted by a label row carrying the setting's
+	 * name and value, so the gap here is what keeps two *hit* areas from touching,
+	 * not what makes the two controls distinguishable.
 	 */
 	.panel__control + .panel__control {
-		margin-top: 1.15rem;
-		padding-top: 1.15rem;
+		margin-top: 0.35rem;
+		padding-top: 0.35rem;
 	}
 }

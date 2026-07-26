@@ -46,8 +46,18 @@ const waitMs = Number(positional[2] ?? (phone ? 8_000 : 30_000));
 const PORTRAIT = { width: 390, height: 664 };
 const LANDSCAPE = { width: 844, height: 320 };
 
-/** The smallest target a finger hits reliably, in CSS pixels. */
+/*
+ * Minimum hit heights, in CSS pixels — two of them, not one.
+ *
+ * Restart and the toggle are tapped once and get the usual 44px. Sliders get
+ * 32px: six of them stacked on a phone are not six independent targets, and at
+ * 44px apiece the sheet ran 270px past the screen, which made every control
+ * harder to reach rather than easier. A slider is dragged rather than tapped and
+ * spans the panel's full width, so its height is the least of what makes it
+ * hittable.
+ */
 const MINIMUM_TARGET = 44;
+const MINIMUM_SLIDER = 32;
 
 const browser = await chromium.launch({
 	// Headless Chromium has no GPU here; SwiftShader draws in software.
@@ -96,12 +106,12 @@ function readLayout() {
 		...document.querySelectorAll(".panel__slider"),
 		...document.querySelectorAll(".panel__restart"),
 		...document.querySelectorAll(".panel__toggle"),
-		...document.querySelectorAll(".panel__close"),
 		...document.querySelectorAll(".panel__signature"),
 	]
 		.filter(shown)
 		.map((element) => ({
 			className: element.className,
+			isSlider: element.classList.contains("panel__slider"),
 			height: Math.round(element.getBoundingClientRect().height),
 		}));
 
@@ -127,8 +137,46 @@ function readLayout() {
 							(canvas.getContext("webgl2") ?? canvas.getContext("webgl")) !==
 							null,
 					},
-		panel: panel === null ? null : { shown: shown(panel), ...box(panel) },
-		toggle: toggle === null ? null : { shown: shown(toggle), ...box(toggle) },
+		panel:
+			panel === null
+				? null
+				: {
+						shown: shown(panel),
+						...box(panel),
+						/*
+						 * The measurement that matters, and the one this harness used to
+						 * miss. The panel's *box* always fits the viewport, because
+						 * `max-height` caps it — so asserting that proves nothing while
+						 * the content overflows inside and scrolls. It shipped 852px of
+						 * controls into a 664px screen and reported success.
+						 */
+						contentHeight: panel.scrollHeight,
+						visibleHeight: panel.clientHeight,
+					},
+		toggle:
+			toggle === null
+				? null
+				: {
+						shown: shown(toggle),
+						...box(toggle),
+						/*
+						 * Which element the toggle is positioned against — a structural
+						 * proxy for a bug headless genuinely cannot reproduce.
+						 *
+						 * `position: fixed` resolves against the layout viewport, which on
+						 * iOS Safari is the large one, so the toggle sat behind the browser
+						 * toolbar and was unreachable. Chromium has no toolbar and measured
+						 * it comfortably on screen. A fixed element reports `offsetParent`
+						 * null; positioned inside the `100dvh` layer it reports the layer.
+						 * Asserting the layer is therefore the check that fails the moment
+						 * someone reverts to `position: fixed`.
+						 */
+						positionedAgainst: toggle.offsetParent === null
+							? null
+							: toggle.offsetParent.classList.contains("panel-layer")
+								? "panel-layer"
+								: toggle.offsetParent.className,
+					},
 		targets,
 		hint,
 		heapMB: performance.memory
@@ -173,11 +221,24 @@ function checkOpened(where, layout) {
 		fail(where, "open panel overlaps the toggle that dismisses it");
 	}
 
+	/*
+	 * The controls have to fit, not merely the box that holds them. Portrait only:
+	 * a phone in landscape is 320px tall and six sliders cannot fit in that at any
+	 * size, so the sheet scrolls there by design.
+	 */
+	if (where === "portrait" && layout.panel.contentHeight > layout.panel.visibleHeight) {
+		fail(
+			where,
+			`controls do not fit — ${layout.panel.contentHeight}px of content in a ${layout.panel.visibleHeight}px sheet, so it scrolls`,
+		);
+	}
+
 	for (const target of layout.targets) {
-		if (target.height < MINIMUM_TARGET) {
+		const minimum = target.isSlider ? MINIMUM_SLIDER : MINIMUM_TARGET;
+		if (target.height < minimum) {
 			fail(
 				where,
-				`${target.className} is ${target.height}px tall, under the ${MINIMUM_TARGET}px minimum`,
+				`${target.className} is ${target.height}px tall, under the ${minimum}px minimum`,
 			);
 		}
 	}
@@ -218,6 +279,14 @@ if (phone) {
 	}
 	if (atRest.toggle === null || !atRest.toggle.shown) {
 		fail("portrait", "no toggle to open the panel with");
+	} else if (atRest.toggle.positionedAgainst !== "panel-layer") {
+		// The one iOS bug this harness can catch structurally rather than visually:
+		// `position: fixed` reports `offsetParent` null and puts the toggle behind
+		// the Safari toolbar, which Chromium does not have and cannot show.
+		fail(
+			"portrait",
+			`toggle is positioned against ${atRest.toggle.positionedAgainst ?? "the layout viewport"} rather than the 100dvh layer — it will sit behind the iOS browser toolbar`,
+		);
 	}
 	if (atRest.canvas === null || !atRest.canvas.hasContext) {
 		fail("portrait", "no WebGL context — nothing is being drawn");
