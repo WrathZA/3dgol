@@ -104,6 +104,10 @@ function readLayout() {
 	// rule that missed one would still pass a sample of the first.
 	const targets = [
 		...document.querySelectorAll(".panel__slider"),
+		// The switch row, not the drawn track inside it: the label wraps the input,
+		// so the whole row is what a finger lands on and the track alone would
+		// measure 18px and fail a control that is comfortably hittable.
+		...document.querySelectorAll(".panel__control--switch"),
 		...document.querySelectorAll(".panel__restart"),
 		...document.querySelectorAll(".panel__toggle"),
 		...document.querySelectorAll(".panel__signature"),
@@ -111,7 +115,15 @@ function readLayout() {
 		.filter(shown)
 		.map((element) => ({
 			className: element.className,
-			isSlider: element.classList.contains("panel__slider"),
+			// The switch is held to the slider's minimum rather than the tapped
+			// control's, for the reason the sliders are: it is one of seven settings
+			// stacked in a sheet, not an independent target, and the label wraps the
+			// input so the hit area is the sheet's full width. Holding it to 44px
+			// pushed the portrait sheet past the screen, which is the #10 failure —
+			// a control that is technically large and actually harder to reach.
+			isSlider:
+				element.classList.contains("panel__slider") ||
+				element.classList.contains("panel__control--switch"),
 			height: Math.round(element.getBoundingClientRect().height),
 		}));
 
