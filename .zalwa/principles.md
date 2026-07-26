@@ -45,3 +45,17 @@ Any feature that implies retained history — timeline scrubbing, replay, seekin
 exporting past states — contradicts it. Such a request is a PRD conversation, not an implementation one.
 This principle is recorded explicitly because scrubbing is the most tempting item on the out-of-scope
 list, and the natural instinct is to add it as a helpful extra.
+
+## 6. The age cap and the explosion are one mechanism
+
+Death by Old Age exists to produce the Explosion. The PRD is explicit that the cap is there to keep the
+structure moving, and that the Explosion "makes that disturbance the visible event rather than an
+incidental side effect" — the cap's justification is the burst it causes.
+
+Stripped of the Explosion, the cap still perturbs a stable region: a still life dying does change its
+neighbours' counts. It simply does not sustain anything. #30's own measurements put the population at
+0.9–1.4% live by generation 250 with Explosions off, against 4–6% with them on — a slow bleed rather than
+a re-seeding. So any control that reaches one must reach both, and it should be named after the mechanism
+rather than after the Explosion. The Explosion is the half you can see; the cap is the half that decides
+whether anything is alive to see. This is recorded because the natural way to write that control is as a
+boolean named after the visible half, which ships the useless configuration by default.
